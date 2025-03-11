@@ -1,0 +1,7 @@
+# Ignore WordPress core files
+/wp-admin/
+/wp-includes/
+/wp-content/uploads/
+/wp-content/cache/
+/wp-config.php
+/debug.log
