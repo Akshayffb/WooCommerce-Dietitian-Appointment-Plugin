@@ -12,7 +12,7 @@ This is a custom WordPress plugin that integrates with WooCommerce to allow diet
 ## Installation
 1. Download or clone the repository into your WordPress `wp-content/plugins/` directory:
    ```sh
-   git clone https://github.com/your-username/your-plugin-repo.git wp-content/plugins/woocommerce-dietitian-scheduler
+   git clone https://github.com/Akshayffb/WooCommerce-Dietitian-Appointment-Plugin.git wp-content/plugins/woocommerce-dietitian-booking
    ```
 2. Navigate to the **Plugins** section in your WordPress admin panel.
 3. Activate the **WooCommerce Dietitian Appointment Scheduling** plugin.
@@ -30,7 +30,7 @@ This will render the appointment booking form for users.
 ### Cloning the Repository
 If you want to contribute or customize the plugin, first clone the repository:
 ```sh
-git clone https://github.com/your-username/your-plugin-repo.git
+git clone https://github.com/Akshayffb/WooCommerce-Dietitian-Appointment-Plugin.git
 ```
 
 ### Tracking Changes
@@ -41,7 +41,7 @@ git init
 git add .
 git commit -m "Initial commit"
 git branch -M main
-git remote add origin https://github.com/your-username/your-plugin-repo.git
+git remote add origin https://github.com/Akshayffb/WooCommerce-Dietitian-Appointment-Plugin.git
 git push -u origin main
 ```
 
