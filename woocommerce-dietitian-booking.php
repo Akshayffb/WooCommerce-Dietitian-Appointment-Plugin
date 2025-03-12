@@ -66,6 +66,7 @@ function wdb_activate()
     api_secret TEXT NOT NULL,
     callback_url TEXT NOT NULL,
     meeting_duration INT(10) NOT NULL,
+    shortcode_slug TEXT NOT NULL,
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) $charset_collate;";
 
@@ -214,3 +215,120 @@ function wdb_my_bookings_shortcode()
 }
 
 add_shortcode('wdb_my_bookings', 'wdb_my_bookings_shortcode');
+
+// Plugin Activation Hook: Ensures "My Appointments" is added to My Account
+function wdb_plugin_activate()
+{
+  wdb_add_appointments_endpoint(); // Ensure endpoint exists
+  flush_rewrite_rules(); // Refresh permalinks
+
+  // Get existing menu items
+  $menu_items = get_option('woocommerce_account_menu_items', []);
+
+  // Check if 'My Appointments' is already added, if not, add it
+  if (!array_key_exists('my-appointments', $menu_items)) {
+    $menu_items['my-appointments'] = __('My Appointments', 'your-text-domain');
+    update_option('woocommerce_account_menu_items', $menu_items);
+  }
+
+  // Automatically create "My Appointments" page with a unique name
+  wdb_create_appointments_page();
+}
+register_activation_hook(__FILE__, 'wdb_plugin_activate');
+
+
+
+// Function to create a unique My Appointments page
+function wdb_create_appointments_page()
+{
+  if (get_option('wdb_appointments_page_id')) {
+    return; // Page already exists, no need to create again
+  }
+
+  $page_title = 'My Appointments ';
+
+  $page_id = wp_insert_post([
+    'post_title'   => $page_title,
+    'post_content' => '[wdb_my_appointments]',
+    'post_status'  => 'publish',
+    'post_type'    => 'page',
+  ]);
+
+  if ($page_id) {
+    update_option('wdb_appointments_page_id', $page_id); // Store the page ID
+  }
+}
+
+// Add Rewrite Endpoint for My Appointments
+function wdb_add_appointments_endpoint()
+{
+  add_rewrite_endpoint('my-appointments', EP_PAGES);
+}
+add_action('init', 'wdb_add_appointments_endpoint');
+
+// Add 'My Appointments' to WooCommerce My Account Menu
+function wdb_add_my_appointments_menu($items)
+{
+  $items['my-appointments'] = __('My Appointments', 'your-text-domain');
+  return $items;
+}
+add_filter('woocommerce_account_menu_items', 'wdb_add_my_appointments_menu');
+
+// Show Appointments on the My Account Page
+function wdb_my_appointments_content()
+{
+  global $wpdb;
+  $user_id = get_current_user_id();
+
+  if (!$user_id) {
+    echo '<p>' . esc_html__('You must be logged in to view your appointments.', 'your-text-domain') . '</p>';
+    return;
+  }
+
+  $appointments_table = $wpdb->prefix . 'wdb_appointments';
+  $appointments = $wpdb->get_results($wpdb->prepare(
+    "SELECT * FROM $appointments_table WHERE customer_id = %d ORDER BY appointment_date DESC",
+    $user_id
+  ));
+
+  if (!$appointments) {
+    echo '<p>' . esc_html__('No appointments available.', 'your-text-domain') . '</p>';
+    return;
+  }
+
+  echo '<table class="shop_table shop_table_responsive my_account_orders">';
+  echo '<thead><tr><th>' . esc_html__('Appointment Date', 'your-text-domain') . '</th><th>' . esc_html__('Dietitian', 'your-text-domain') . '</th><th>' . esc_html__('Status', 'your-text-domain') . '</th><th>' . esc_html__('Meeting Link', 'your-text-domain') . '</th><th>' . esc_html__('Order', 'your-text-domain') . '</th></tr></thead><tbody>';
+
+  foreach ($appointments as $appointment) {
+    $dietitian = $wpdb->get_var($wpdb->prepare(
+      "SELECT name FROM {$wpdb->prefix}wdb_dietitians WHERE id = %d",
+      $appointment->dietitian_id
+    ));
+
+    // Get order details
+    $order_id = intval($appointment->order_id);
+    $order_link = esc_url(wc_get_endpoint_url('view-order', $order_id, wc_get_page_permalink('myaccount')));
+
+    echo '<tr>';
+    echo '<td>' . esc_html(date('Y-m-d H:i', strtotime($appointment->appointment_date))) . '</td>';
+    echo '<td>' . esc_html($dietitian) . '</td>';
+    echo '<td>' . esc_html(ucfirst($appointment->status)) . '</td>';
+    echo '<td><a href="' . esc_url($appointment->meeting_link) . '" target="_blank">' . esc_html__('Join Meeting', 'your-text-domain') . '</a></td>';
+    echo '<td><a href="' . $order_link . '">#' . esc_html($order_id) . '</a></td>';
+    echo '</tr>';
+  }
+
+  echo '</tbody></table>';
+
+
+  echo '</tbody></table>';
+}
+add_action('woocommerce_account_my-appointments_endpoint', 'wdb_my_appointments_content');
+
+// Flush rewrite rules once after plugin activation
+add_action('admin_init', function () {
+  if (get_option('wdb_permalinks_flushed') !== 'yes') {
+    flush_rewrite_rules();
+    update_option('wdb_permalinks_flushed', 'yes');
+  }
+});

@@ -15,7 +15,7 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
     wp_die(__('Security check failed.', 'textdomain'));
   }
 
-  $fields = ['scheduling_api', 'api_key', 'api_secret', 'callback_url', 'meeting_duration'];
+  $fields = ['scheduling_api', 'api_key', 'api_secret', 'callback_url', 'meeting_duration', 'shortcode_slug'];
   $data = [];
 
   foreach ($fields as $field) {
@@ -44,7 +44,6 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_settings'])) {
 
 // Fetch settings
 $settings = $wpdb->get_row("SELECT * FROM $table_name WHERE id = 1", ARRAY_A) ?: [];
-
 ?>
 
 <div class="wrap">
@@ -81,8 +80,11 @@ $settings = $wpdb->get_row("SELECT * FROM $table_name WHERE id = 1", ARRAY_A) ?:
         <th><label for="meeting_duration">Default Meeting Duration (Minutes)</label></th>
         <td><input type="number" name="meeting_duration" id="meeting_duration" class="small-text" value="<?php echo esc_attr($settings['meeting_duration'] ?? '30'); ?>"></td>
       </tr>
+      <tr>
+        <th><label for="shortcode_slug">Page Slug for Shortcode</label></th>
+        <td><input type="text" name="shortcode_slug" id="shortcode_slug" class="regular-text" placeholder="/book-appointment" value="<?php echo esc_attr($settings['shortcode_slug'] ?? ''); ?>"></td>
+      </tr>
     </table>
-
     <div>
       <p>To display the booking form, use this shortcode:
         <strong id="shortcode-text">[wdb_booking_form]</strong>
