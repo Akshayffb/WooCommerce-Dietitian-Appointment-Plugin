@@ -47,7 +47,7 @@ function wdb_render_booking_form()
 
   // Get all dietitians
   $dietitians_table = $wpdb->prefix . 'wdb_dietitians';
-  $dietitians = $wpdb->get_results("SELECT id, name FROM $dietitians_table");
+  $dietitians = $wpdb->get_results("SELECT id, name, email FROM $dietitians_table");
 
   $success_message = '';
 
@@ -75,21 +75,81 @@ function wdb_render_booking_form()
       ]
     );
 
+    unset($_SESSION['wdb_order_id']);
+
+    // Fetch dietitian details
+    $dietitian = $wpdb->get_row($wpdb->prepare("SELECT name, email FROM $dietitians_table WHERE id = %d", $dietitian_id));
+
+    if ($dietitian) {
+      $dietitian_name = esc_html($dietitian->name);
+      $dietitian_email = esc_html($dietitian->email);
+
+      $site_name = get_bloginfo('name');
+      // Email Subject
+      $subject = "📅 Appointment Confirmation with $dietitian_name";
+
+      // Email Message (HTML)
+      $message = "
+            <html>
+            <head>
+                <title>$subject</title>
+                <style>
+                    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+                    .email-container { max-width: 600px; background: #ffffff; margin: 20px auto; padding: 30px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); text-align: left; }
+                    .content { padding: 20px; }
+                    .content h2 { color: #333; font-size: 24px; margin-bottom: 15px; }
+                    .content p { color: #555; font-size: 16px; margin-bottom: 15px; }
+                    .btn { background: #0073aa; color: white; padding: 14px 20px; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 16px; font-weight: bold; margin-top: 20px; }
+                    .footer { margin-top: 30px; font-size: 14px; color: #777; }
+                </style>
+            </head>
+            <body>
+                <div class='email-container'>
+                    <div class='content'>
+                        <h2>Hi $user_name,</h2>
+                        <p>Your appointment with <strong>$dietitian_name</strong> has been successfully booked.</p>
+                        <p><strong>Appointment Date:</strong> $appointment_date</p>
+                        <p><strong>Meeting Link:</strong> <a href='$meeting_link'>$meeting_link</a></p>
+                        <p>If you have any questions, feel free to reach out.</p>
+                        <p>Best regards,<br>The Team</p>
+                    </div>
+                    <div class='footer'>
+                      &copy; <?php echo date('Y') . ' ' . esc_html($site_name); ?>. All rights reserved.</div>
+                </div>
+            </body>
+            </html>";
+
+      // Email Headers
+      $from_email = get_option('admin_email');
+      $headers = [
+        'Content-Type: text/html; charset=UTF-8',
+        'From: ' . get_bloginfo('name') . ' <' . esc_attr($from_email) . '>'
+      ];
+
+      // Send email to user
+      wp_mail($user_email, $subject, $message, $headers);
+
+      // Send email to dietitian (same template)
+      $dietitian_subject = "📅 New Appointment Scheduled with $user_name";
+      $dietitian_message = str_replace($user_name, $dietitian_name, $message);
+      wp_mail($dietitian_email, $dietitian_subject, $dietitian_message, $headers);
+    }
+
     // Set success message
     $success_message = '<div id="success-message" class="woocommerce-message">Appointment booked successfully! Redirecting you in <span id="counter">3</span> seconds...</div>';
     $redirect_url = site_url('/my-account/my-appointments');
     $success_message .= "
-            <script>
-                var counter = 3;
-                var countdown = setInterval(function() {
-                    document.getElementById('counter').textContent = counter;
-                    counter--;
-                    if (counter < 0) {
-                        clearInterval(countdown);
-                        window.location.href = '{$redirect_url}';
-                    }
-                }, 1000);
-            </script>
+        <script>
+            var counter = 3;
+            var countdown = setInterval(function() {
+                document.getElementById('counter').textContent = counter;
+                counter--;
+                if (counter < 0) {
+                    clearInterval(countdown);
+                    window.location.href = '{$redirect_url}';
+                }
+            }, 1000);
+        </script>
         ";
   }
 

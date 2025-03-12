@@ -65,7 +65,7 @@ $appointments = $wpdb->get_results($query);
 
 <div class="wrap">
   <h1 class="wp-heading-inline">All Appointments</h1>
-  <a href="<?php echo admin_url('admin.php?page=wdb-add-appointment'); ?>" class="page-title-action">Add New</a>
+  <a href="<?php echo esc_url(admin_url('admin.php?page=wdb-add-appointment')); ?>" class="page-title-action">Add New</a>
   <hr class="wp-header-end">
 
   <?php settings_errors('wdb_messages'); ?>
@@ -92,11 +92,16 @@ $appointments = $wpdb->get_results($query);
             <tr>
               <td><?php echo esc_html($appointment->id); ?></td>
               <td>
-                <a href="<?php echo esc_url(admin_url('edit.php?post_type=shop_order&action=edit&post=' . $appointment->order_id)); ?>">
-                  <?php echo esc_html($appointment->order_id); ?>
+                <a href="<?php echo esc_url(admin_url('post.php?post=' . $appointment->order_id . '&action=edit')); ?>">
+                  #<?php echo esc_html($appointment->order_id); ?>
                 </a>
               </td>
-              <td><?php echo esc_html($appointment->customer_id); ?></td>
+              <td>
+                <?php
+                $customer = get_user_by('ID', $appointment->customer_id);
+                echo $customer ? esc_html($customer->display_name) : '<span class="text-danger">Unknown</span>';
+                ?>
+              </td>
               <td>
                 <?php if ($appointment->dietitian_id) : ?>
                   <a href="<?php echo esc_url(admin_url('user-edit.php?user_id=' . $appointment->dietitian_id)); ?>">
@@ -106,22 +111,22 @@ $appointments = $wpdb->get_results($query);
                   <span class="text-danger">Unassigned</span>
                 <?php endif; ?>
               </td>
-              <td><?php echo esc_html($appointment->appointment_date); ?></td>
+              <td><?php echo esc_html(date('Y-m-d H:i', strtotime($appointment->appointment_date))); ?></td>
               <td>
-                <?php if ($appointment->meeting_link) : ?>
+                <?php if (!empty($appointment->meeting_link)) : ?>
                   <a href="<?php echo esc_url($appointment->meeting_link); ?>" target="_blank">Join</a>
                 <?php else : ?>
                   <span class="text-muted">No link</span>
                 <?php endif; ?>
               </td>
               <td>
-                <span class="badge bg-<?php echo ($appointment->status == 'confirmed') ? 'success' : 'warning'; ?>">
+                <span class="status-<?php echo esc_attr($appointment->status); ?>">
                   <?php echo esc_html(ucfirst($appointment->status)); ?>
                 </span>
               </td>
               <?php if (current_user_can('manage_options')) : ?>
                 <td>
-                  <a href="<?php echo admin_url('admin.php?page=wdb-add-appointment&edit_id=' . $appointment->id); ?>" class="button">Edit</a>
+                  <a href="<?php echo esc_url(admin_url('admin.php?page=wdb-add-appointment&edit_id=' . $appointment->id)); ?>" class="button">Edit</a>
                   <form method="post" style="display:inline;">
                     <?php wp_nonce_field('delete_appointment_action', 'delete_appointment_nonce'); ?>
                     <input type="hidden" name="delete_appointment" value="<?php echo esc_attr($appointment->id); ?>">

@@ -35,6 +35,6 @@ function wdb_add_booking_link($order_id)
   // Get dynamic slug
   $booking_slug = wdb_get_booking_slug();
 
-  echo '<p><a href="' . site_url('/' . $booking_slug . '/?order_id=' . $order_id) . '" class="button" target="_blank">Book Your Dietitian</a></p>';
+  echo '<p><a href="' . site_url('/' . $booking_slug . '/?order_id=' . $order_id) . '" class="button">Book Your Dietitian</a></p>';
 }
 add_action('woocommerce_thankyou', 'wdb_add_booking_link', 20);

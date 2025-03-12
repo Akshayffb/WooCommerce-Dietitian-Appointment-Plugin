@@ -24,7 +24,6 @@ function wdb_activate()
   $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_appointments");
   $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_dietitians");
   $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_settings");
-  $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_forms");
 
 
   // Dietitians Table (Updated Fields)
@@ -70,23 +69,12 @@ function wdb_activate()
     updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
   ) $charset_collate;";
 
-
-  $forms_table = $wpdb->prefix . 'wdb_forms';
-  $sql4 = "CREATE TABLE $forms_table (
-      id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-      form_name VARCHAR(255) NOT NULL,
-      fields TEXT NOT NULL,
-      shortcode VARCHAR(50) NOT NULL UNIQUE,
-      created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-  ) $charset_collate;";
-
   // Execute table creation
   require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
   dbDelta($sql1);
   dbDelta($sql2);
   dbDelta($sql3);
-  dbDelta($sql4);
 
   // Check for errors
   if ($wpdb->last_error) {
@@ -149,20 +137,20 @@ function wdb_add_admin_menu()
 
   add_submenu_page(
     'wdb-all-appointments',
-    'Components',
-    'Components',
+    'All Dietitians',
+    'All Dietitians',
     'manage_options',
-    'wdb-components',
-    'wdb_components_page'
+    'wdb-all-dietitians',
+    'wdb_all_dietitians_page'
   );
 
   add_submenu_page(
     'wdb-all-appointments',
-    'Dietitian',
-    'Dietitian',
+    'Add/Edit Dietitian',
+    'Add New Dietitian',
     'manage_options',
     'wdb-add-dietitian',
-    'wdb_add_dietitian_page'
+    'wdb_display_add_dietitian'
   );
 
   add_submenu_page(
@@ -186,9 +174,14 @@ function wdb_display_add_appointment()
   include_once plugin_dir_path(__FILE__) . 'includes/new-appointment.php';
 }
 
-function wdb_add_dietitian_page()
+function wdb_all_dietitians_page()
 {
-  include_once plugin_dir_path(__FILE__) . 'includes/add-dietitian.php';
+  include_once plugin_dir_path(__FILE__) . 'includes/all-dietitian.php';
+}
+
+function wdb_display_add_dietitian()
+{
+  include_once plugin_dir_path(__FILE__) . 'includes/new-dietitian.php';
 }
 
 function wdb_settings_page()
@@ -196,16 +189,9 @@ function wdb_settings_page()
   include_once plugin_dir_path(__FILE__) . 'includes/settings.php';
 }
 
-function wdb_components_page()
-{
-  include_once plugin_dir_path(__FILE__) . 'includes/components/form-creator.php';
-}
-
 add_action('admin_menu', 'wdb_add_admin_menu');
 
 require_once plugin_dir_path(__FILE__) . 'includes/components/shortcodes.php';
-require_once plugin_dir_path(__FILE__) . 'includes/components/form-handler.php';
-
 
 function wdb_my_bookings_shortcode()
 {
