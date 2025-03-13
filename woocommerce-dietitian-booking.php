@@ -25,7 +25,6 @@ function wdb_activate()
   $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_dietitians");
   $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_settings");
 
-
   // Dietitians Table (Updated Fields)
   $dietitians_table = $wpdb->prefix . 'wdb_dietitians';
   $sql1 = "CREATE TABLE $dietitians_table (
@@ -85,18 +84,6 @@ function wdb_activate()
 // Run activation function
 register_activation_hook(__FILE__, 'wdb_activate');
 
-function register_dietitian_role()
-{
-  add_role('dietitian', 'Dietitian', [
-    'read' => true,
-    'edit_posts' => true,
-    'delete_posts' => false,
-    'upload_files' => true
-  ]);
-}
-
-add_action('init', 'register_dietitian_role');
-
 // Load Plugin Functionality
 function wdb_init()
 {
@@ -108,20 +95,20 @@ add_action('plugins_loaded', 'wdb_init');
 function wdb_add_admin_menu()
 {
   add_menu_page(
-    'Dietitian Bookings',   // Page Title
-    'Dietitian Bookings',   // Menu Title
-    'manage_options',       // Capability (Admin Only)
-    'wdb-all-appointments', // Default Page
-    'wdb_all_appointments_page', // Function Callback
-    'dashicons-calendar-alt', // Icon
-    56                      // Position in Menu
+    'Dietitian Bookings',
+    'Dietitian Bookings',
+    'view_wdb_appointments', // Admins only
+    'wdb-all-appointments',
+    'wdb_all_appointments_page',
+    'dashicons-calendar-alt',
+    56
   );
 
   add_submenu_page(
     'wdb-all-appointments',
     'All Appointments',
     'All Appointments',
-    'manage_options',
+    'view_wdb_appointments', // Dietitians & Admins
     'wdb-all-appointments',
     'wdb_all_appointments_page'
   );
@@ -130,7 +117,7 @@ function wdb_add_admin_menu()
     'wdb-all-appointments',
     'Add/Edit Appointment',
     'Add New Appointment',
-    'manage_options',
+    'edit_wdb_appointments', // Dietitians & Admins
     'wdb-add-appointment',
     'wdb_display_add_appointment'
   );
@@ -139,7 +126,7 @@ function wdb_add_admin_menu()
     'wdb-all-appointments',
     'All Dietitians',
     'All Dietitians',
-    'manage_options',
+    'manage_options', // Admins only
     'wdb-all-dietitians',
     'wdb_all_dietitians_page'
   );
@@ -148,7 +135,7 @@ function wdb_add_admin_menu()
     'wdb-all-appointments',
     'Add/Edit Dietitian',
     'Add New Dietitian',
-    'manage_options',
+    'manage_options', // Admins only
     'wdb-add-dietitian',
     'wdb_display_add_dietitian'
   );
@@ -157,11 +144,60 @@ function wdb_add_admin_menu()
     'wdb-all-appointments',
     'Settings',
     'Settings',
-    'manage_options',
+    'manage_options', // Admins only
     'wdb-settings',
     'wdb_settings_page'
   );
 }
+
+add_action('admin_menu', 'wdb_add_admin_menu');
+
+function wdb_register_dietitian_role()
+{
+  // Create Dietitian role if it doesn't exist
+  if (!get_role('dietitian')) {
+    add_role('dietitian', 'Dietitian', [
+      'read'                  => true,  // Can access admin
+      'upload_files'          => false, // No media uploads
+      'edit_posts'            => false, // No post editing
+      'list_users'            => false, // No user management
+      'edit_wdb_appointments' => true,  // Can edit appointments
+      'view_wdb_appointments' => true   // Can view appointments
+    ]);
+  }
+
+  // Ensure Dietitian role has correct capabilities
+  $role = get_role('dietitian');
+  if ($role) {
+    $capabilities = [
+      'edit_wdb_appointments',
+      'view_wdb_appointments'
+    ];
+
+    foreach ($capabilities as $cap) {
+      if (!$role->has_cap($cap)) {
+        $role->add_cap($cap);
+      }
+    }
+  }
+
+  // Ensure Admins Have Full Access
+  $admin_role = get_role('administrator');
+  if ($admin_role) {
+    $admin_caps = [
+      'edit_wdb_appointments',
+      'view_wdb_appointments'
+    ];
+
+    foreach ($admin_caps as $cap) {
+      if (!$admin_role->has_cap($cap)) {
+        $admin_role->add_cap($cap);
+      }
+    }
+  }
+}
+
+add_action('admin_init', 'wdb_register_dietitian_role');
 
 // Callback Functions for Submenu Pages
 function wdb_all_appointments_page()
@@ -188,8 +224,6 @@ function wdb_settings_page()
 {
   include_once plugin_dir_path(__FILE__) . 'includes/settings.php';
 }
-
-add_action('admin_menu', 'wdb_add_admin_menu');
 
 require_once plugin_dir_path(__FILE__) . 'includes/components/shortcodes.php';
 
@@ -269,3 +303,28 @@ add_action('admin_init', function () {
     update_option('wdb_permalinks_flushed', 'yes');
   }
 });
+
+function custom_login_redirect($redirect_to, $request, $user)
+{
+  if (isset($user->roles) && is_array($user->roles)) {
+    if (in_array('dietitian', $user->roles)) {
+      return admin_url(); // Redirect to wp-admin
+    }
+  }
+  return $redirect_to;
+}
+add_filter('login_redirect', 'custom_login_redirect', 10, 3);
+
+function wdb_debug_current_user_capabilities()
+{
+  if (is_user_logged_in()) {
+    $user = wp_get_current_user();
+    $caps = $user->allcaps;
+
+    // Log capabilities to debug.log
+    error_log("User: " . $user->user_login);
+    error_log("Role: " . implode(', ', $user->roles));
+    error_log("Capabilities: " . print_r($caps, true));
+  }
+}
+// add_action('init', 'wdb_debug_current_user_capabilities');
