@@ -47,7 +47,7 @@ function wdb_activate()
   $sql2 = "CREATE TABLE $appointments_table (
         id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
         customer_id BIGINT(20) NOT NULL,
-        order_id BIGINT(20) NOT NULL,
+        order_id BIGINT(20) NOT NULL UNIQUE,
         dietitian_id BIGINT(20) UNSIGNED NOT NULL,
         meeting_link TEXT,
         appointment_date DATETIME NOT NULL,
@@ -228,7 +228,7 @@ register_activation_hook(__FILE__, 'wdb_plugin_activate');
 function wdb_create_appointments_page()
 {
   if (get_option('wdb_appointments_page_id')) {
-    return; // Page already exists, no need to create again
+    return;
   }
 
   $page_title = 'My Appointments ';
@@ -241,7 +241,7 @@ function wdb_create_appointments_page()
   ]);
 
   if ($page_id) {
-    update_option('wdb_appointments_page_id', $page_id); // Store the page ID
+    update_option('wdb_appointments_page_id', $page_id);
   }
 }
 
@@ -260,56 +260,7 @@ function wdb_add_my_appointments_menu($items)
 }
 add_filter('woocommerce_account_menu_items', 'wdb_add_my_appointments_menu');
 
-// Show Appointments on the My Account Page
-function wdb_my_appointments_content()
-{
-  global $wpdb;
-  $user_id = get_current_user_id();
-
-  if (!$user_id) {
-    echo '<p>' . esc_html__('You must be logged in to view your appointments.', 'your-text-domain') . '</p>';
-    return;
-  }
-
-  $appointments_table = $wpdb->prefix . 'wdb_appointments';
-  $appointments = $wpdb->get_results($wpdb->prepare(
-    "SELECT * FROM $appointments_table WHERE customer_id = %d ORDER BY appointment_date DESC",
-    $user_id
-  ));
-
-  if (!$appointments) {
-    echo '<p>' . esc_html__('No appointments available.', 'your-text-domain') . '</p>';
-    return;
-  }
-
-  echo '<table class="shop_table shop_table_responsive my_account_orders">';
-  echo '<thead><tr><th>' . esc_html__('Appointment Date', 'your-text-domain') . '</th><th>' . esc_html__('Dietitian', 'your-text-domain') . '</th><th>' . esc_html__('Status', 'your-text-domain') . '</th><th>' . esc_html__('Meeting Link', 'your-text-domain') . '</th><th>' . esc_html__('Order', 'your-text-domain') . '</th></tr></thead><tbody>';
-
-  foreach ($appointments as $appointment) {
-    $dietitian = $wpdb->get_var($wpdb->prepare(
-      "SELECT name FROM {$wpdb->prefix}wdb_dietitians WHERE id = %d",
-      $appointment->dietitian_id
-    ));
-
-    // Get order details
-    $order_id = intval($appointment->order_id);
-    $order_link = esc_url(wc_get_endpoint_url('view-order', $order_id, wc_get_page_permalink('myaccount')));
-
-    echo '<tr>';
-    echo '<td>' . esc_html(date('Y-m-d H:i', strtotime($appointment->appointment_date))) . '</td>';
-    echo '<td>' . esc_html($dietitian) . '</td>';
-    echo '<td>' . esc_html(ucfirst($appointment->status)) . '</td>';
-    echo '<td><a href="' . esc_url($appointment->meeting_link) . '" target="_blank">' . esc_html__('Join Meeting', 'your-text-domain') . '</a></td>';
-    echo '<td><a href="' . $order_link . '">#' . esc_html($order_id) . '</a></td>';
-    echo '</tr>';
-  }
-
-  echo '</tbody></table>';
-
-
-  echo '</tbody></table>';
-}
-add_action('woocommerce_account_my-appointments_endpoint', 'wdb_my_appointments_content');
+require_once plugin_dir_path(__FILE__) . '/includes/my-appointments.php';
 
 // Flush rewrite rules once after plugin activation
 add_action('admin_init', function () {

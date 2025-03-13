@@ -3,17 +3,6 @@ if (!defined('ABSPATH')) {
   exit;
 }
 
-// Start session if not started already
-if (!function_exists('wdb_start_session')) {
-  function wdb_start_session()
-  {
-    if (!session_id()) {
-      session_start();
-    }
-  }
-}
-add_action('init', 'wdb_start_session');
-
 // Render Booking Form
 function wdb_render_booking_form()
 {
@@ -30,8 +19,24 @@ function wdb_render_booking_form()
   $user_email = esc_attr($current_user->user_email);
 
   // Get order_id from URL or session
-  $order_id = isset($_GET['order_id']) ? intval($_GET['order_id']) : ($_SESSION['wdb_order_id'] ?? 0);
+  $order_id = isset($_GET['order_id']) ? intval($_GET['order_id']) : 0;
+
   if ($order_id == 0) {
+    $args = [
+      'customer_id' => $user_id,
+      'limit' => 1,
+      'orderby' => 'date',
+      'order' => 'DESC',
+      'return' => 'ids',
+    ];
+    $orders = wc_get_orders($args);
+
+    if (!empty($orders)) {
+      $order_id = $orders[0];
+    }
+  }
+
+  if (!$order_id) {
     return '<div class="woocommerce-error">Invalid Order ID. Please provide a valid order.</div>';
   }
 
@@ -57,12 +62,34 @@ function wdb_render_booking_form()
     $appointment_date = sanitize_text_field($_POST['appointment_date']);
     $status = 'Confirmed';
 
-    if (!$dietitian_id || empty($appointment_date)) {
-      return '<div class="woocommerce-error">Please provide all required details.</div>';
+    if (!$order_id) {
+      $success_message = '<div id="success-message" class="woocommerce-error">Invalid Order ID. Please provide a valid order.</div>';
+      return $success_message;
+    }
+
+    $dietitian = $wpdb->get_row($wpdb->prepare("SELECT id, name, email FROM $dietitians_table WHERE id = %d", $dietitian_id));
+    if (!$dietitian) {
+      $success_message = '<div id="success-message" class="woocommerce-error">Invalid Dietitian. Please select a valid dietitian.</div>';
+      return $success_message;
+    }
+
+    if (empty($appointment_date)) {
+      $success_message = '<div id="success-message" class="woocommerce-error">Please provide an appointment date.</div>';
+      return $success_message;
+    }
+
+    $appointments_table = $wpdb->prefix . 'wdb_appointments';
+    $existing_booking = $wpdb->get_var($wpdb->prepare(
+      "SELECT id FROM $appointments_table WHERE order_id = %d",
+      $order_id
+    ));
+
+    if ($existing_booking) {
+      $success_message = '<div id="success-message" class="woocommerce-info">An appointment has already been booked for this order.</div>';
+      return $success_message;
     }
 
     // Insert into database
-    $appointments_table = $wpdb->prefix . 'wdb_appointments';
     $wpdb->insert(
       $appointments_table,
       [
@@ -75,24 +102,18 @@ function wdb_render_booking_form()
       ]
     );
 
-    unset($_SESSION['wdb_order_id']);
+    delete_post_meta($order_id, '_wdb_order_id');
 
-    // Fetch dietitian details
-    $dietitian = $wpdb->get_row($wpdb->prepare("SELECT name, email FROM $dietitians_table WHERE id = %d", $dietitian_id));
+    $dietitian_name = esc_html($dietitian->name);
+    $dietitian_email = esc_html($dietitian->email);
+    $site_name = get_bloginfo('name');
 
-    if ($dietitian) {
-      $dietitian_name = esc_html($dietitian->name);
-      $dietitian_email = esc_html($dietitian->email);
+    $customer_subject = "📅 Appointment Confirmation with Dietitian $dietitian_name";
 
-      $site_name = get_bloginfo('name');
-      // Email Subject
-      $subject = "📅 Appointment Confirmation with $dietitian_name";
-
-      // Email Message (HTML)
-      $message = "
+    $customer_message = "
             <html>
             <head>
-                <title>$subject</title>
+                <title>$customer_subject</title>
                 <style>
                     body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
                     .email-container { max-width: 600px; background: #ffffff; margin: 20px auto; padding: 30px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); text-align: left; }
@@ -106,41 +127,73 @@ function wdb_render_booking_form()
             <body>
                 <div class='email-container'>
                     <div class='content'>
-                        <h2>Hi $user_name,</h2>
-                        <p>Your appointment with <strong>$dietitian_name</strong> has been successfully booked.</p>
-                        <p><strong>Appointment Date:</strong> $appointment_date</p>
-                        <p><strong>Meeting Link:</strong> <a href='$meeting_link'>$meeting_link</a></p>
-                        <p>If you have any questions, feel free to reach out.</p>
-                        <p>Best regards,<br>The Team</p>
-                    </div>
+                        <h3>Hi $user_name,</h3>
+            <p>Thank you for booking your appointment with <strong>$dietitian_name</strong>.</p>
+            <p>Here are your appointment details:</p>
+            <p>Date & Time: $appointment_date</p>
+            <p>Meeting Link: <a href='$meeting_link'>$meeting_link</a></p>
+            <p>To get the most out of your session, consider preparing a list of questions or topics you'd like to discuss.</p>
+            <p>If you have any concerns or need to reschedule, feel free to reach out.</p>
+            <p>We look forward to seeing you!</p>
+            <p>Best regards,<br>The $site_name Team</p>
                     <div class='footer'>
-                      &copy; <?php echo date('Y') . ' ' . esc_html($site_name); ?>. All rights reserved.</div>
+                      &copy; " . date('Y') . " " . esc_html($site_name) . ". All rights reserved.</div>
                 </div>
             </body>
             </html>";
 
-      // Email Headers
-      $from_email = get_option('admin_email');
-      $headers = [
-        'Content-Type: text/html; charset=UTF-8',
-        'From: ' . get_bloginfo('name') . ' <' . esc_attr($from_email) . '>'
-      ];
+    $headers = [
+      'Content-Type: text/html; charset=UTF-8',
+      'From: ' . get_bloginfo('name') . ' <' . esc_attr(get_option('admin_email')) . '>'
+    ];
 
-      // Send email to user
-      wp_mail($user_email, $subject, $message, $headers);
+    // Send email to the customer
+    wp_mail($user_email, $customer_subject, $customer_message, $headers);
 
-      // Send email to dietitian (same template)
-      $dietitian_subject = "📅 New Appointment Scheduled with $user_name";
-      $dietitian_message = str_replace($user_name, $dietitian_name, $message);
-      wp_mail($dietitian_email, $dietitian_subject, $dietitian_message, $headers);
-    }
+    // Email content for Dietitian
+    $dietitian_subject = "📅 New Appointment Scheduled with $user_name";
+
+    $dietitian_message = "
+            <html>
+            <head>
+                <title>$dietitian_subject</title>
+                <style>
+                    body { font-family: Arial, sans-serif; background-color: #f4f4f4; margin: 0; padding: 0; }
+                    .email-container { max-width: 600px; background: #ffffff; margin: 20px auto; padding: 30px; border-radius: 8px; box-shadow: 0px 0px 10px rgba(0, 0, 0, 0.1); text-align: left; }
+                    .content { padding: 20px; }
+                    .content h2 { color: #333; font-size: 24px; margin-bottom: 15px; }
+                    .content p { color: #555; font-size: 16px; margin-bottom: 15px; }
+                    .btn { background: #0073aa; color: white; padding: 14px 20px; text-decoration: none; display: inline-block; border-radius: 5px; font-size: 16px; font-weight: bold; margin-top: 20px; }
+                    .footer { margin-top: 30px; font-size: 14px; color: #777; }
+                </style>
+            </head>
+            <body>
+                <div class='email-container'>
+                    <div class='content'>
+                        <h3>Hello $dietitian_name,</h3>
+            <p>You have a new appointment scheduled with <strong>$user_name.</p>
+            <p>Here are the details:</p>
+            <p>Date & Time: $appointment_date</p>
+            <p>Meeting Link: <a href='$meeting_link'>$meeting_link</a></p>
+            <p>Please review any notes or history before the session to provide the best advice.</p>
+            <p>Make sure to be available on time and prepare any necessary resources.</p>
+            <p>Best regards,<br>The $site_name Team</p>
+                    </div>
+                    <div class='footer'>
+                      &copy; " . date('Y') . " " . esc_html($site_name) . ". All rights reserved.</div>
+                </div>
+            </body>
+            </html>";
+
+    // Send email to the dietitian
+    wp_mail($dietitian_email, $dietitian_subject, $dietitian_message, $headers);
 
     // Set success message
-    $success_message = '<div id="success-message" class="woocommerce-message">Appointment booked successfully! Redirecting you in <span id="counter">3</span> seconds...</div>';
+    $success_message = '<div id="success-message" class="woocommerce-message">Appointment booked successfully! A confirmation email has been sent to your email. Redirecting you in <span id="counter">3</span> seconds...</div>';
     $redirect_url = site_url('/my-account/my-appointments');
     $success_message .= "
         <script>
-            var counter = 3;
+            var counter = 5;
             var countdown = setInterval(function() {
                 document.getElementById('counter').textContent = counter;
                 counter--;

@@ -24,17 +24,17 @@ function wdb_get_booking_slug()
   return $slug ? esc_attr($slug) : 'book-appointment';
 }
 
-
-function wdb_add_booking_link($order_id)
-{
+function wdb_add_booking_link($order_id) {
   if (!$order_id) return;
 
-  // Store order ID in session
-  $_SESSION['wdb_order_id'] = $order_id;
+  update_post_meta($order_id, '_wdb_order_id', $order_id);
 
-  // Get dynamic slug
+  if (!function_exists('wdb_get_booking_slug')) {
+      return;
+  }
+
   $booking_slug = wdb_get_booking_slug();
 
-  echo '<p><a href="' . site_url('/' . $booking_slug . '/?order_id=' . $order_id) . '" class="button">Book Your Dietitian</a></p>';
+  echo '<p><a href="' . esc_url(site_url('/' . $booking_slug . '/?order_id=' . $order_id)) . '" class="button wc-forward th-btn th_btn style4">Book Appointment</a></p>';
 }
-add_action('woocommerce_thankyou', 'wdb_add_booking_link', 20);
+add_action('woocommerce_thankyou', 'wdb_add_booking_link', 5);
