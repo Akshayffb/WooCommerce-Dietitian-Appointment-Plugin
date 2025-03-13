@@ -44,7 +44,7 @@ function wdb_render_booking_form()
   $settings_table = $wpdb->prefix . 'wdb_settings';
   $settings = $wpdb->get_row("SELECT * FROM $settings_table", ARRAY_A);
   if (!$settings) {
-    return '<div class="woocommerce-error">Settings not found.</div>';
+    return '<div class="woocommerce-error">Appointment scheduling settings are not configured. Please contact support.</div>';
   }
 
   $callback_url = $settings['callback_url'] ?? '';

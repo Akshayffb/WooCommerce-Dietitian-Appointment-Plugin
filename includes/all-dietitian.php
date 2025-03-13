@@ -58,7 +58,11 @@ $dietitians = $wpdb->get_results("SELECT * FROM $table_name ORDER BY id ASC");
       <?php foreach ($dietitians as $dietitian) : ?>
         <tr>
           <td><?php echo esc_html($dietitian->id); ?></td>
-          <td><?php echo esc_html($dietitian->name); ?></td>
+          <td>
+            <a href="<?php echo esc_url(get_edit_user_link(get_user_by('email', $dietitian->email)->ID)); ?>">
+              <?php echo esc_html($dietitian->name); ?>
+            </a>
+          </td>
           <td><?php echo esc_html($dietitian->email); ?></td>
           <td><?php echo esc_html($dietitian->phone); ?></td>
           <td><?php echo esc_html($dietitian->specialization); ?></td>

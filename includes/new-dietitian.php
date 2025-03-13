@@ -63,9 +63,29 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_dietitian'])) {
     } elseif ($wpdb->get_var($wpdb->prepare("SELECT id FROM $table_name WHERE email = %s", $email))) {
       add_settings_error('wdb_messages', 'email_exists', __('Error: Email already exists!', 'textdomain'), 'error');
     } else {
+      $user_id = null;
+
+      // Create WordPress user only if login is allowed
+      if ($allow_login) {
+        $existing_user = get_user_by('email', $email);
+        if (!$existing_user) {
+          $user_id = wp_create_user($email, wp_generate_password(12, true), $email);
+          if (!is_wp_error($user_id)) {
+            wp_update_user(['ID' => $user_id, 'display_name' => $name]);
+            $user = new WP_User($user_id);
+            $user->set_role('dietitian');
+
+            send_welcome_email($name, $email, $user_id);
+          }
+        } else {
+          $user_id = $existing_user->ID;
+        }
+      }
+
       $result = $wpdb->insert(
         $table_name,
         [
+          'user_id'        => $user_id,
           'name'           => $name,
           'email'          => $email,
           'phone'          => $phone,
@@ -73,27 +93,14 @@ if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['save_dietitian'])) {
           'experience'     => $experience,
           'allow_login'    => $allow_login
         ],
-        ['%s', '%s', '%s', '%s', '%d', '%d']
+        ['%d', '%s', '%s', '%s', '%s', '%d', '%d']
       );
 
       if ($result !== false) {
         $message = __('The dietitian has been added successfully.', 'textdomain');
 
-        // Create WordPress user only if login is allowed
-        if ($allow_login) {
-          $existing_user = get_user_by('email', $email);
-          if (!$existing_user) {
-            $user_id = wp_create_user($email, wp_generate_password(12, true), $email);
-            if (!is_wp_error($user_id)) {
-              wp_update_user(['ID' => $user_id, 'display_name' => $name]);
-              $user = new WP_User($user_id);
-              $user->set_role('dietitian');
-
-              send_welcome_email($name, $email, $user_id);
-
-              $message .= ' ' . __('An invitation email has been sent to the new dietitian.', 'textdomain');
-            }
-          }
+        if ($allow_login && $user_id) {
+          $message .= ' ' . __('An invitation email has been sent to the new dietitian.', 'textdomain');
         }
 
         add_settings_error('wdb_messages', 'success', $message, 'updated');
@@ -181,7 +188,15 @@ function send_welcome_email($name, $email, $user_id)
       </tr>
       <tr>
         <th><label for="dietitian_phone">Phone</label></th>
-        <td><input type="tel" name="dietitian_phone" id="dietitian_phone" value="<?php echo esc_attr($dietitian->phone ?? ''); ?>" class="regular-text"></td>
+        <td>
+          <input type="tel" name="dietitian_phone" id="dietitian_phone"
+            value="<?php echo esc_attr($dietitian->phone ?? ''); ?>"
+            class="regular-text"
+            pattern="[0-9]{11}"
+            placeholder="Enter 11-digit phone number"
+            maxlength="11"
+            required>
+        </td>
       </tr>
       <tr>
         <th><label for="dietitian_specialization">Specialization</label></th>

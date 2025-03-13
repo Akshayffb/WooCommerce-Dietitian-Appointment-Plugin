@@ -29,6 +29,7 @@ function wdb_activate()
   $dietitians_table = $wpdb->prefix . 'wdb_dietitians';
   $sql1 = "CREATE TABLE $dietitians_table (
         id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+        user_id BIGINT(20) UNSIGNED NULL,
         name VARCHAR(255) NOT NULL,
         email VARCHAR(255) NOT NULL UNIQUE,
         phone VARCHAR(50),
@@ -89,15 +90,16 @@ function wdb_init()
 {
   include_once plugin_dir_path(__FILE__) . 'includes/booking-functions.php';
 }
+
 add_action('plugins_loaded', 'wdb_init');
 
-// Admin Menu with Submenus
+// Admin Menu Setup
 function wdb_add_admin_menu()
 {
   add_menu_page(
     'Dietitian Bookings',
     'Dietitian Bookings',
-    'view_wdb_appointments', // Admins only
+    'view_wdb_appointments',
     'wdb-all-appointments',
     'wdb_all_appointments_page',
     'dashicons-calendar-alt',
@@ -152,9 +154,9 @@ function wdb_add_admin_menu()
 
 add_action('admin_menu', 'wdb_add_admin_menu');
 
+// Create Dietitian role if it doesn't exist
 function wdb_register_dietitian_role()
 {
-  // Create Dietitian role if it doesn't exist
   if (!get_role('dietitian')) {
     add_role('dietitian', 'Dietitian', [
       'read'                  => true,  // Can access admin
@@ -225,8 +227,6 @@ function wdb_settings_page()
   include_once plugin_dir_path(__FILE__) . 'includes/settings.php';
 }
 
-require_once plugin_dir_path(__FILE__) . 'includes/components/shortcodes.php';
-
 function wdb_my_bookings_shortcode()
 {
   ob_start();
@@ -236,27 +236,26 @@ function wdb_my_bookings_shortcode()
 
 add_shortcode('wdb_my_bookings', 'wdb_my_bookings_shortcode');
 
+require_once plugin_dir_path(__FILE__) . 'includes/components/shortcodes.php';
+
+
 // Plugin Activation Hook: Ensures "My Appointments" is added to My Account
 function wdb_plugin_activate()
 {
-  wdb_add_appointments_endpoint(); // Ensure endpoint exists
-  flush_rewrite_rules(); // Refresh permalinks
+  wdb_add_appointments_endpoint();
+  flush_rewrite_rules();
 
   // Get existing menu items
   $menu_items = get_option('woocommerce_account_menu_items', []);
 
-  // Check if 'My Appointments' is already added, if not, add it
-  if (!array_key_exists('my-appointments', $menu_items)) {
+  if (!isset($menu_items['my-appointments'])) {
     $menu_items['my-appointments'] = __('My Appointments', 'your-text-domain');
     update_option('woocommerce_account_menu_items', $menu_items);
   }
 
-  // Automatically create "My Appointments" page with a unique name
   wdb_create_appointments_page();
 }
 register_activation_hook(__FILE__, 'wdb_plugin_activate');
-
-
 
 // Function to create a unique My Appointments page
 function wdb_create_appointments_page()
@@ -265,10 +264,8 @@ function wdb_create_appointments_page()
     return;
   }
 
-  $page_title = 'My Appointments ';
-
   $page_id = wp_insert_post([
-    'post_title'   => $page_title,
+    'post_title'   => 'My Appointments',
     'post_content' => '[wdb_my_appointments]',
     'post_status'  => 'publish',
     'post_type'    => 'page',
@@ -304,27 +301,11 @@ add_action('admin_init', function () {
   }
 });
 
-function custom_login_redirect($redirect_to, $request, $user)
+function custom_login_redirect($user_login, $user)
 {
-  if (isset($user->roles) && is_array($user->roles)) {
-    if (in_array('dietitian', $user->roles)) {
-      return admin_url(); // Redirect to wp-admin
-    }
-  }
-  return $redirect_to;
-}
-add_filter('login_redirect', 'custom_login_redirect', 10, 3);
-
-function wdb_debug_current_user_capabilities()
-{
-  if (is_user_logged_in()) {
-    $user = wp_get_current_user();
-    $caps = $user->allcaps;
-
-    // Log capabilities to debug.log
-    error_log("User: " . $user->user_login);
-    error_log("Role: " . implode(', ', $user->roles));
-    error_log("Capabilities: " . print_r($caps, true));
+  if (in_array('dietitian', $user->roles)) {
+    wp_redirect(admin_url());
+    exit;
   }
 }
-// add_action('init', 'wdb_debug_current_user_capabilities');
+add_action('wp_login', 'custom_login_redirect', 10, 2);
