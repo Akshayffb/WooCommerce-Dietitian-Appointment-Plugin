@@ -47,42 +47,57 @@ if ($is_edit) {
 if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['wdb_save_appointment'])) {
   check_admin_referer('wdb_appointment_action', 'wdb_appointment_nonce');
 
-  $order_id = intval($_POST['order_id']);
-  $customer_id = intval($_POST['customer_id']);
-  $dietitian_id_input = intval($_POST['dietitian_id']);
-  $appointment_date = sanitize_text_field($_POST['appointment_date']);
-  $meeting_link = esc_url_raw($_POST['meeting_link']);
   $status = sanitize_text_field($_POST['status']);
 
   if ($is_edit) {
-    // Dietitians can only update their own appointments
-    if ($is_dietitian && $appointment->dietitian_id != $dietitian_id) {
-      wp_die(__('You can only edit your own appointments.', 'textdomain'));
-    }
+    if ($is_dietitian) {
+      // Dietitians can only update the status field
+      $result = $wpdb->update(
+        $appointments_table,
+        ['status' => $status],
+        ['id' => $edit_id, 'dietitian_id' => $dietitian_id],
+        ['%s'],
+        ['%d', '%d']
+      );
+    } else {
+      // Admins can update all fields
+      $order_id = intval($_POST['order_id']);
+      $customer_id = intval($_POST['customer_id']);
+      $dietitian_id_input = intval($_POST['dietitian_id']);
+      $appointment_date = sanitize_text_field($_POST['appointment_date']);
+      $meeting_link = esc_url_raw($_POST['meeting_link']);
 
-    // Update appointment
-    $result = $wpdb->update(
-      $appointments_table,
-      [
-        'order_id'         => $order_id,
-        'customer_id'      => $customer_id,
-        'dietitian_id'     => $dietitian_id_input,
-        'appointment_date' => $appointment_date,
-        'meeting_link'     => $meeting_link,
-        'status'           => $status,
-      ],
-      ['id' => $edit_id],
-      ['%d', '%d', '%d', '%s', '%s', '%s'],
-      ['%d']
-    );
+      $result = $wpdb->update(
+        $appointments_table,
+        [
+          'order_id'         => $order_id,
+          'customer_id'      => $customer_id,
+          'dietitian_id'     => $dietitian_id_input,
+          'appointment_date' => $appointment_date,
+          'meeting_link'     => $meeting_link,
+          'status'           => $status,
+        ],
+        ['id' => $edit_id],
+        ['%d', '%d', '%d', '%s', '%s', '%s'],
+        ['%d']
+      );
+    }
 
     if ($result === false) {
       echo '<div class="error notice is-dismissible"><p>Error updating appointment: ' . $wpdb->last_error . '</p></div>';
     } else {
-      echo '<div class="updated notice is-dismissible"><p>Rows affected: ' . $result . '</p></div>';
+      echo '<div class="updated notice is-dismissible"><p>Appointment updated successfully.</p></div>';
+      echo '<script>window.location.href = window.location.href;</script>';
+      exit;
     }
   } elseif ($is_admin) {
     // Admins can create new appointments
+    $order_id = intval($_POST['order_id']);
+    $customer_id = intval($_POST['customer_id']);
+    $dietitian_id_input = intval($_POST['dietitian_id']);
+    $appointment_date = sanitize_text_field($_POST['appointment_date']);
+    $meeting_link = esc_url_raw($_POST['meeting_link']);
+
     $wpdb->insert(
       $appointments_table,
       [
@@ -146,11 +161,11 @@ $dietitians = $wpdb->get_results("SELECT id, name FROM $dietitians_table");
       </tr>
       <tr>
         <th><label for="appointment_date">Appointment Date</label></th>
-        <td><input type="datetime-local" name="appointment_date" id="appointment_date" value="<?php echo esc_attr($appointment->appointment_date ?? ''); ?>" required class="regular-text"></td>
+        <td><input type="datetime-local" name="appointment_date" id="appointment_date" value="<?php echo esc_attr($appointment->appointment_date ?? ''); ?>" required class="regular-text" <?php echo $is_dietitian ? 'disabled' : ''; ?>></td>
       </tr>
       <tr>
         <th><label for="meeting_link">Meeting Link</label></th>
-        <td><input type="url" name="meeting_link" id="meeting_link" value="<?php echo esc_attr($appointment->meeting_link ?? ''); ?>" class="regular-text"></td>
+        <td><input type="url" name="meeting_link" id="meeting_link" value="<?php echo esc_attr($appointment->meeting_link ?? ''); ?>" class="regular-text" <?php echo $is_dietitian ? 'disabled' : ''; ?>></td>
       </tr>
       <tr>
         <th><label for="status">Status</label></th>
@@ -164,7 +179,6 @@ $dietitians = $wpdb->get_results("SELECT id, name FROM $dietitians_table");
         </td>
       </tr>
     </table>
-
     <p class="submit">
       <button type="submit" name="wdb_save_appointment" class="button button-primary"><?php echo $is_edit ? 'Update Appointment' : 'Save Appointment'; ?></button>
     </p>
