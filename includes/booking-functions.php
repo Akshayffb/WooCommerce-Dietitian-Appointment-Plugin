@@ -13,7 +13,7 @@ if (!function_exists('wdb_start_session')) {
     }
   }
 }
-add_action('init', 'wdb_start_session');
+// add_action('init', 'wdb_start_session');
 
 // Fetch the page slug dynamically from the database
 function wdb_get_booking_slug()
