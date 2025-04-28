@@ -31,135 +31,12 @@ if (!defined('ABSPATH')) {
 
 
 // Hook to activate plugin (Ensures tables are created)
+require_once plugin_dir_path(__FILE__) . 'includes/database/db-schema.php';
 
 function wdb_activate()
-
 {
-
-  global $wpdb;
-
-  $charset_collate = $wpdb->get_charset_collate();
-
-
-
-  // Drop old tables if they exist (in correct order)
-
-  // $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_appointments");
-
-  // $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_dietitians");
-
-  // $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}wdb_settings");
-
-
-
-  // Dietitians Table (Updated Fields)
-
-  $dietitians_table = $wpdb->prefix . 'wdb_dietitians';
-  $appointments_table = $wpdb->prefix . 'wdb_appointments';
-  $settings_table = $wpdb->prefix . 'wdb_settings';
-
-  $sql1 = "CREATE TABLE $dietitians_table (
-
-        id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-
-        user_id BIGINT(20) UNSIGNED NULL,
-
-        name VARCHAR(255) NOT NULL,
-
-        email VARCHAR(255) NOT NULL UNIQUE,
-
-        phone VARCHAR(50),
-
-        specialization VARCHAR(255),
-
-        experience INT(3),
-
-        availability TEXT,
-
-        consultation_fee DECIMAL(10,2),
-
-        bio TEXT,
-
-        allow_login TINYINT(1) DEFAULT 0,
-
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
-
-    ) $charset_collate;";
-
-
-
-  // Appointments Table (Retaining this in case it's needed)
-
-  $sql2 = "CREATE TABLE $appointments_table (
-
-        id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-
-        customer_id BIGINT(20) NOT NULL,
-
-        order_id BIGINT(20) NOT NULL UNIQUE,
-
-        dietitian_id BIGINT(20) UNSIGNED NOT NULL,
-
-        meeting_link TEXT,
-
-        appointment_date DATETIME NOT NULL,
-
-        status VARCHAR(50) NOT NULL DEFAULT 'pending',
-
-        created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-
-        FOREIGN KEY (dietitian_id) REFERENCES $dietitians_table(id) ON DELETE CASCADE
-
-    ) $charset_collate;";
-
-
-
-  // Settings Table (Retaining this in case it's needed)
-  $sql3 = "CREATE TABLE $settings_table (
-
-    id BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
-
-    scheduling_api VARCHAR(255) NOT NULL,
-
-    api_key TEXT NOT NULL,
-
-    api_secret TEXT NOT NULL,
-
-    callback_url TEXT NOT NULL,
-
-    meeting_duration INT(10) NOT NULL,
-
-    shortcode_slug TEXT NOT NULL,
-
-    updated_at DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
-
-  ) $charset_collate;";
-
-
-
-  // Execute table creation
-
-  require_once ABSPATH . 'wp-admin/includes/upgrade.php';
-
-  dbDelta($sql1);
-
-  dbDelta($sql2);
-
-  dbDelta($sql3);
-
-
-
-  // Check for errors
-
-  if ($wpdb->last_error) {
-
-    error_log("DB Error: " . $wpdb->last_error);
-  }
+  wdb_run_schema_updates();
 }
-
-
-
-// Run activation function
 
 register_activation_hook(__FILE__, 'wdb_activate');
 
@@ -293,8 +170,25 @@ function wdb_add_admin_menu()
     'wdb_settings_page'
 
   );
-}
 
+  add_submenu_page(
+    'wdb-all-appointments',
+    'Manage APIs',
+    'Manage APIs',
+    'manage_options',
+    'wdb-manage-apis',
+    'wdb_list_apis_page'
+  );
+
+  add_submenu_page(
+    'wdb-manage-apis',
+    'Add New API',
+    'Add New API',
+    'manage_options',
+    'wdb-add-api',
+    'wdb_add_api_page'
+  );
+}
 
 
 add_action('admin_menu', 'wdb_add_admin_menu');
@@ -549,6 +443,10 @@ require_once plugin_dir_path(__FILE__) . '/includes/dietitian-meeting-note.php';
 
 
 require_once plugin_dir_path(__FILE__) . '/includes/order-schedules/order-schedules.php';
+
+include_once plugin_dir_path(__FILE__) . 'includes/orders/order-main.php';
+
+require_once plugin_dir_path(__FILE__) . '/includes/apis/api-main.php';
 
 // Flush rewrite rules once after plugin activation
 
