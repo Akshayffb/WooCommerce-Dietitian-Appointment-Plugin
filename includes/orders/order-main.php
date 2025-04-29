@@ -1,103 +1,117 @@
 <?php
-// Main file for handling all order-related functionality
+// Hook to WooCommerce order completion
+add_action('woocommerce_thankyou', 'wdb_store_order_meta_to_meal_plan_table', 10, 1);
 
-add_action('woocommerce_new_order', 'store_meal_plan_details_from_order', 10, 1);
-
-function store_meal_plan_details_from_order($order_id)
+function wdb_store_order_meta_to_meal_plan_table($order_id)
 {
-    if (!function_exists('wc_get_order')) {
-        return;
-    }
+    if (!$order_id) return;
 
     global $wpdb;
-    $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
+    $table = $wpdb->prefix . 'wdb_meal_plans';
 
     $order = wc_get_order($order_id);
-    if (!$order) {
-        error_log('Order not found for ID: ' . $order_id);
-        return;
-    }
-
     $user_id = $order->get_user_id();
-    $grand_total = $order->get_total();
+    $grand_total = (float) $order->get_total();
 
-    foreach ($order->get_items() as $item_id => $item) {
-        $product_id = $item->get_product_id();
-        $product = wc_get_product($product_id);
-
-        if (!$product) {
-            error_log('Product not found for ID: ' . $product_id);
-            continue;
-        }
-
-        // Get product-specific meta from order item
+    foreach ($order->get_items() as $item) {
+        $product = $item->get_product();
         $product_name = $item->get_name();
-        $start_date = wc_get_order_item_meta($item_id, 'start date', true);
-        $ingredients = wc_get_order_item_meta($item_id, 'ingredients', true);
-        $select_days = wc_get_order_item_meta($item_id, 'select days', true);
-        $meal_type = wc_get_order_item_meta($item_id, 'meal type', true);
-        $lunch_time = wc_get_order_item_meta($item_id, 'lunch time', true);
-        $dinner_time = wc_get_order_item_meta($item_id, 'dinner time', true);
-        $breakfast_time = wc_get_order_item_meta($item_id, 'breakfast time', true);
-        $food_notes = wc_get_order_item_meta($item_id, 'food notes', true);
 
-        // Get plan_duration (Number of Salads attribute)
-        $plan_duration = $product->get_attribute('number of salads');
-        if (empty($plan_duration)) {
-            $plan_duration = 0;
+        // Default values
+        $start_date = '';
+        $ingredients = '';
+        $selected_days = [];
+        $meal_type = [];
+        $delivery_time = [];
+
+        // Loop through metadata and extract values
+        foreach ($item->get_meta_data() as $meta) {
+            $meta_key = strtolower($meta->key);
+            $meta_value = $meta->value;
+
+            if ($meta_key === 'start date' && !empty($meta_value)) {
+                $start_date = esc_html($meta_value);
+            }
+
+            if ($meta_key === 'ingredients' && !empty($meta_value) && is_string($meta_value)) {
+                $lines = explode("\n", $meta_value);
+                $clean_values = [];
+
+                foreach ($lines as $line) {
+                    $parts = explode('|', $line);
+                    if (isset($parts[1])) {
+                        $value = trim($parts[1]);
+                        if (!empty($value)) {
+                            $clean_values[] = $value;
+                        }
+                    }
+                }
+
+                $ingredients = esc_html(implode(', ', $clean_values));
+            }
+
+            if ($meta_key === 'select days' && !empty($meta_value)) {
+                $days_array = array_filter(array_map('trim', preg_split('/[\s,|]+/', strtolower($meta_value))));
+                $selected_days = array_unique($days_array);
+            }
+
+            if ($meta_key === 'meal type' && !empty($meta_value)) {
+                $meal_type = array_map('trim', explode('|', $meta_value));
+            }
+
+            if (in_array($meta_key, ['lunch time', 'dinner time', 'breakfast time']) && !empty($meta_value)) {
+                $parts = explode('|', $meta_value);
+                $time_only = isset($parts[0]) ? trim($parts[0]) : '';
+                if (!empty($time_only)) {
+                    $delivery_time[] = $time_only;
+                }
+            }
         }
 
-        // Get Product Category
-        $categories = wp_get_post_terms($product_id, 'product_cat', array('fields' => 'names'));
-        $category = !empty($categories) ? implode(', ', $categories) : '';
+        // Get first category name
+        $categories = wp_get_post_terms($product->get_id(), 'product_cat');
+        $category_name = !empty($categories) ? $categories[0]->name : '';
 
-        // Combine the times
-        $times = [
-            'breakfast' => $breakfast_time,
-            'lunch' => $lunch_time,
-            'dinner' => $dinner_time,
-        ];
-        $time_serialized = maybe_serialize($times);
+        // Insert into DB
+        $wpdb->insert($table, [
+            'order_id'      => $order_id,
+            'user_id'       => $user_id,
+            'plan_name'     => $product_name,
+            'plan_duration' => get_plan_duration($order),
+            'category'      => $category_name,
+            'start_date'    => date('Y-m-d', strtotime($start_date)),
+            'selected_days' => maybe_serialize($selected_days),
+            'meal_type'     => maybe_serialize($meal_type),
+            'time'          => implode("\n", $delivery_time),
+            'ingredients'   => maybe_serialize($ingredients),
+            'grand_total'   => $grand_total,
+            'notes'         => $item->get_meta('food_notes'),
+        ]);
+    }
+}
 
-        // Prepare data for insertion
-        $data = [
-            'order_id' => $order_id,
-            'user_id' => $user_id,
-            'plan_name' => $product_name,
-            'plan_duration' => intval($plan_duration),
-            'category' => $category,
-            'start_date' => $start_date,
-            'selected_days' => maybe_serialize($select_days),
-            'meal_type' => maybe_serialize($meal_type),
-            'time' => $time_serialized,
-            'ingredients' => maybe_serialize($ingredients),
-            'grand_total' => $grand_total,
-            'notes' => $food_notes,
-            'created_at' => current_time('mysql')
-        ];
+function get_plan_duration($order)
+{
+    foreach ($order->get_items() as $item) {
+        $product = $item->get_product();
 
-        $format = [
-            '%d',
-            '%d',
-            '%s',
-            '%d',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%s',
-            '%f',
-            '%s',
-            '%s'
-        ];
+        if ($product) {
+            $attributes = $product->get_attributes();
+            foreach ($attributes as $attribute) {
+                $attr_name = wc_attribute_label($attribute->get_name());
+                if (strtolower($attr_name) === 'number of salads') {
+                    $salads = $attribute->get_options();
+                    return implode(', ', $salads);
+                }
+            }
 
-        // Insert into meal plan table
-        $inserted = $wpdb->insert($meal_plan_table, $data, $format);
-
-        if ($inserted) {
-            error_log('Meal Plan Inserted Successfully: ' . print_r($data, true));
-        } else {
-            error_log('Meal Plan Insert Failed: ' . $wpdb->last_error . ' | Data: ' . print_r($data, true));
+            // Optional fallback
+            $meta_salads = $item->get_meta('Number of Salads', true);
+            if ($meta_salads) {
+                return $meta_salads;
+            }
         }
     }
+
+    return null;
 }
