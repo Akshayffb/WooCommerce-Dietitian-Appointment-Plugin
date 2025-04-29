@@ -1,126 +1,103 @@
 <?php
 // Main file for handling all order-related functionality
 
-// Hook into WooCommerce order creation to trigger logging
-add_action('woocommerce_new_order', 'log_new_order_data', 10, 1);
+add_action('woocommerce_new_order', 'store_meal_plan_details_from_order', 10, 1);
 
-// Function to log order data when a new order is created
-function log_new_order_data($order_id)
+function store_meal_plan_details_from_order($order_id)
 {
-    // Access the WooCommerce order object
+    if (!function_exists('wc_get_order')) {
+        return;
+    }
+
+    global $wpdb;
+    $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
+
     $order = wc_get_order($order_id);
-
     if (!$order) {
-        return; // Order not found, exit
+        error_log('Order not found for ID: ' . $order_id);
+        return;
     }
 
-    // Gather all order data to log
-    $order_data = [
-        'order_id'            => $order->get_id(),
-        'order_key'           => $order->get_order_key(),
-        'order_total'         => $order->get_total(),
-        'order_status'        => $order->get_status(),
-        'payment_method'      => $order->get_payment_method(),
-        'payment_method_title'=> $order->get_payment_method_title(),
-        'shipping_method'     => get_shipping_methods($order),  // Shipping method
-    ];
+    $user_id = $order->get_user_id();
+    $grand_total = $order->get_total();
 
-    // Order Items and details (such as ingredients, start date, etc.)
-    $items = $order->get_items();
-    $order_items = [];
-    foreach ($items as $item_id => $item) {
-        $product = $item->get_product();
+    foreach ($order->get_items() as $item_id => $item) {
+        $product_id = $item->get_product_id();
+        $product = wc_get_product($product_id);
 
-        // Retrieve custom fields (for ingredients, start date, meal type, etc.)
-        $ingredients = get_post_meta($product->get_id(), '_ingredients', true);
-        $start_date = get_post_meta($product->get_id(), '_start_date', true);
-        $selected_days = get_post_meta($product->get_id(), '_selected_days', true);
-        $meal_type = get_post_meta($product->get_id(), '_meal_type', true);
-        $lunch_time = get_post_meta($product->get_id(), '_lunch_time', true);
+        if (!$product) {
+            error_log('Product not found for ID: ' . $product_id);
+            continue;
+        }
 
-        $order_items[] = [
-            'product_name'    => $item->get_name(),
-            'quantity'        => $item->get_quantity(),
-            'total'           => $item->get_total(),
-            'ingredients'     => $ingredients,
-            'start_date'      => $start_date,
-            'selected_days'   => $selected_days,
-            'meal_type'       => $meal_type,
-            'lunch_time'      => $lunch_time,
+        // Get product-specific meta from order item
+        $product_name = $item->get_name();
+        $start_date = wc_get_order_item_meta($item_id, 'start date', true);
+        $ingredients = wc_get_order_item_meta($item_id, 'ingredients', true);
+        $select_days = wc_get_order_item_meta($item_id, 'select days', true);
+        $meal_type = wc_get_order_item_meta($item_id, 'meal type', true);
+        $lunch_time = wc_get_order_item_meta($item_id, 'lunch time', true);
+        $dinner_time = wc_get_order_item_meta($item_id, 'dinner time', true);
+        $breakfast_time = wc_get_order_item_meta($item_id, 'breakfast time', true);
+        $food_notes = wc_get_order_item_meta($item_id, 'food notes', true);
+
+        // Get plan_duration (Number of Salads attribute)
+        $plan_duration = $product->get_attribute('number of salads');
+        if (empty($plan_duration)) {
+            $plan_duration = 0;
+        }
+
+        // Get Product Category
+        $categories = wp_get_post_terms($product_id, 'product_cat', array('fields' => 'names'));
+        $category = !empty($categories) ? implode(', ', $categories) : '';
+
+        // Combine the times
+        $times = [
+            'breakfast' => $breakfast_time,
+            'lunch' => $lunch_time,
+            'dinner' => $dinner_time,
         ];
+        $time_serialized = maybe_serialize($times);
+
+        // Prepare data for insertion
+        $data = [
+            'order_id' => $order_id,
+            'user_id' => $user_id,
+            'plan_name' => $product_name,
+            'plan_duration' => intval($plan_duration),
+            'category' => $category,
+            'start_date' => $start_date,
+            'selected_days' => maybe_serialize($select_days),
+            'meal_type' => maybe_serialize($meal_type),
+            'time' => $time_serialized,
+            'ingredients' => maybe_serialize($ingredients),
+            'grand_total' => $grand_total,
+            'notes' => $food_notes,
+            'created_at' => current_time('mysql')
+        ];
+
+        $format = [
+            '%d',
+            '%d',
+            '%s',
+            '%d',
+            '%s',
+            '%s',
+            '%s',
+            '%s',
+            '%s',
+            '%f',
+            '%s',
+            '%s'
+        ];
+
+        // Insert into meal plan table
+        $inserted = $wpdb->insert($meal_plan_table, $data, $format);
+
+        if ($inserted) {
+            error_log('Meal Plan Inserted Successfully: ' . print_r($data, true));
+        } else {
+            error_log('Meal Plan Insert Failed: ' . $wpdb->last_error . ' | Data: ' . print_r($data, true));
+        }
     }
-    $order_data['order_items'] = $order_items;
-
-    // Shipping and Billing Details
-    $billing_address = [
-        'name'      => $order->get_billing_first_name() . ' ' . $order->get_billing_last_name(),
-        'address'   => $order->get_billing_address_1(),
-        'city'      => $order->get_billing_city(),
-        'postcode'  => $order->get_billing_postcode(),
-        'country'   => $order->get_billing_country(),
-        'state'     => $order->get_billing_state(),
-        'phone'     => $order->get_billing_phone(),
-        'email'     => $order->get_billing_email(),
-    ];
-
-    $shipping_address = [
-        'name'      => $order->get_shipping_first_name() . ' ' . $order->get_shipping_last_name(),
-        'address'   => $order->get_shipping_address_1(),
-        'city'      => $order->get_shipping_city(),
-        'postcode'  => $order->get_shipping_postcode(),
-        'country'   => $order->get_shipping_country(),
-        'state'     => $order->get_shipping_state(),
-    ];
-
-    $order_data['billing_address'] = $billing_address;
-    $order_data['shipping_address'] = $shipping_address;
-
-    // Convert the order data array to a string for logging
-    $log_entry = "Order ID: {$order_data['order_id']} | " .
-                 "Order Key: {$order_data['order_key']} | " .
-                 "Total: {$order_data['order_total']} | " .
-                 "Status: {$order_data['order_status']} | " .
-                 "Payment Method: {$order_data['payment_method']} | " .
-                 "Payment Title: {$order_data['payment_method_title']} | " .
-                 "Shipping Method: {$order_data['shipping_method']} | " .
-                 "Billing Name: {$billing_address['name']} | " .
-                 "Billing Address: {$billing_address['address']}, {$billing_address['city']}, {$billing_address['postcode']} | " .
-                 "Shipping Name: {$shipping_address['name']} | " .
-                 "Shipping Address: {$shipping_address['address']}, {$shipping_address['city']}, {$shipping_address['postcode']} | ";
-
-    // Log product information
-    foreach ($order_data['order_items'] as $item) {
-        $log_entry .= "Product: {$item['product_name']} | " .
-                      "Quantity: {$item['quantity']} | " .
-                      "Total: {$item['total']} | " .
-                      "Ingredients: {$item['ingredients']} | " .
-                      "Start Date: {$item['start_date']} | " .
-                      "Selected Days: {$item['selected_days']} | " .
-                      "Meal Type: {$item['meal_type']} | " .
-                      "Lunch Time: {$item['lunch_time']} | ";
-    }
-
-    // Log the entry to the log file
-    $log_entry .= "\n";
-
-    // Define the log file path (current plugin directory)
-    $log_file = plugin_dir_path(__FILE__) . 'order-logs.log';
-
-    // Check if the log file exists, if not, create it
-    if (!file_exists($log_file)) {
-        touch($log_file); // Create empty log file
-    }
-
-    // Append the log entry to the file
-    file_put_contents($log_file, $log_entry, FILE_APPEND);
-}
-
-// Function to get shipping methods for the order
-function get_shipping_methods($order)
-{
-    $shipping_methods = [];
-    foreach ($order->get_items('shipping') as $shipping_item) {
-        $shipping_methods[] = $shipping_item->get_method_title();
-    }
-    return implode(", ", $shipping_methods); // Combine all shipping methods into a string
 }
