@@ -14,15 +14,26 @@ function wdb_generate_plan_schedule($order_id)
   }
 
   $selected_days = maybe_unserialize($plan->selected_days);
-  $meal_types    = maybe_unserialize($plan->meal_type);
+  $raw_meal_types = maybe_unserialize($plan->meal_type);
+  $cleaned_meal_types = [];
 
-  $log_file = __DIR__ . '/meal_plan_debug.log';
-
-  if (!file_exists($log_file)) {
-    file_put_contents($log_file, "Log file created at " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
+  if (is_array($raw_meal_types)) {
+    foreach ($raw_meal_types as $type) {
+      // Split on newline, comma, or carriage return
+      $split_types = preg_split('/[\r\n,]+/', $type);
+      foreach ($split_types as $t) {
+        $t = trim($t);
+        if ($t !== '') {
+          $cleaned_meal_types[] = $t;
+        }
+      }
+    }
+  } else {
+    // Fallback if not an array
+    $cleaned_meal_types[] = trim($raw_meal_types);
   }
 
-  file_put_contents($log_file, "meal_types : $meal_types", FILE_APPEND);
+  $cleaned_meal_types = array_unique($cleaned_meal_types);
 
   $start_date    = $plan->start_date;
   $plan_duration = (int)$plan->plan_duration;
@@ -50,12 +61,6 @@ function wdb_generate_plan_schedule($order_id)
         $ingredients = $meal_plan_info['ingredients'];
       }
 
-      if (is_array($meal_types)) {
-        $cleaned_meal_types = array_unique(array_map('trim', $meal_types));
-      } else {
-        $cleaned_meal_types = [$meal_types];
-      }
-
       $schedule_data[] = [
         'no' => $deliveries_made + 1,
         'date' => $current_date->format('d M Y'),
@@ -76,14 +81,6 @@ function wdb_generate_plan_schedule($order_id)
 
   foreach ($schedule_data as $schedule) {
 
-    $meal_types = maybe_unserialize($schedule['meal_type']);
-
-    if (is_array($meal_types)) {
-      $cleaned_meal_types = array_unique(array_map('trim', $meal_types));
-    } else {
-      $cleaned_meal_types = [$schedule['meal_type']];
-    }
-
     $wpdb->insert(
       $meals_table,
       [
@@ -91,13 +88,12 @@ function wdb_generate_plan_schedule($order_id)
         'serve_date'      => DateTime::createFromFormat('d M Y', $schedule['date'])->format('Y-m-d'),
         'weekday'         => $schedule['day'],
         'meal_info'       => "Meals: " . $schedule['meals'] . " | Ingredients: " . $schedule['ingredients'],
-        'meal_type'       => $schedule['meal_type'],
+        'meal_type' => $schedule['meal_type'],
         'delivery_window' => $schedule['times'],
       ]
     );
   }
 }
-
 
 function calculate_meal_info($date_str, $product_id)
 {
@@ -185,6 +181,7 @@ function calculate_meal_info($date_str, $product_id)
         }
       }
     }
+    wp_reset_postdata();
   }
 
   return ['error' => 'No matching meal plan found.'];

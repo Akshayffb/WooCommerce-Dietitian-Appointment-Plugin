@@ -49,9 +49,9 @@ function wdb_schedule_endpoint_content()
           <th>Sl. No</th>
           <th>Date</th>
           <th>Weekday</th>
-          <th>Meal Info</th>
+          <th style="width: 250px;">Meal Info</th>
           <th>Meal Type</th>
-          <th>Delivery Window</th>
+          <th>Delivery Time</th>
         </tr>
       </thead>
       <tbody>
@@ -64,24 +64,41 @@ function wdb_schedule_endpoint_content()
 
         $sl = 1;
         foreach ($grouped as $group_meals):
-          $first = true;
-          $meal_count = count($group_meals);
-          foreach ($group_meals as $meal): ?>
-            <tr>
-              <?php if ($first): ?>
-                <td rowspan="<?php echo $meal_count; ?>"><?php echo $sl++; ?></td>
-                <td rowspan="<?php echo $meal_count; ?>"><?php echo date('d M Y', strtotime($meal['serve_date'])); ?></td>
-                <td rowspan="<?php echo $meal_count; ?>"><?php echo esc_html($meal['weekday']); ?></td>
-                <td rowspan="<?php echo $meal_count; ?>">
-                  <?php echo nl2br(esc_html($meal['meal_info'])); ?>
-                </td>
-                <?php $first = false; ?>
-              <?php endif; ?>
-              <td><?php echo esc_html($meal['meal_type']); ?></td>
-              <td><?php echo esc_html($meal['delivery_window']); ?></td>
-            </tr>
-        <?php endforeach;
-        endforeach; ?>
+          foreach ($group_meals as $meal):
+            $meal_types = array_map('trim', explode(',', $meal['meal_type']));
+            $delivery_times = array_map('trim', explode(',', $meal['delivery_window']));
+            $count = count($meal_types);
+
+            for ($i = 0; $i < $count; $i++):
+              echo '<tr>';
+
+              // Output Sl No, Date, Weekday, and Meal Info only once with rowspan
+              if ($i === 0):
+                echo '<td rowspan="' . $count . '">' . $sl++ . '</td>';
+                echo '<td rowspan="' . $count . '">' . date('d M Y', strtotime($meal['serve_date'])) . '</td>';
+                echo '<td rowspan="' . $count . '">' . esc_html($meal['weekday']) . '</td>';
+                echo '<td rowspan="' . $count . '">';
+                $meal_info_parts = explode('|', $meal['meal_info']);
+                foreach ($meal_info_parts as $part) {
+                  $part = trim($part);
+                  if (stripos($part, 'Meals:') === 0) {
+                    echo '<div><strong>' . esc_html($part) . '</strong></div>';
+                  } elseif (stripos($part, 'Ingredients:') === 0) {
+                    echo '<div>' . esc_html($part) . '</div>';
+                  } else {
+                    echo '<div>' . esc_html($part) . '</div>';
+                  }
+                }
+                echo '</td>';
+              endif;
+
+              echo '<td>' . esc_html($meal_types[$i]) . '</td>';
+              echo '<td>' . (!empty($delivery_times[$i]) ? esc_html($delivery_times[$i]) : '') . '</td>';
+              echo '</tr>';
+            endfor;
+          endforeach;
+        endforeach;
+        ?>
       </tbody>
     </table>
   <?php else: ?>

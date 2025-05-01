@@ -103,7 +103,7 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
             'start_date'    => date('Y-m-d', strtotime($start_date)),
             'selected_days' => maybe_serialize($selected_days),
             'meal_type'     => maybe_serialize($meal_type),
-            'time'          => implode("\n", $delivery_time),
+            'time'          => implode(',', $delivery_time),
             'ingredients'   => maybe_serialize($ingredients),
             'grand_total'   => $grand_total,
             'notes'         => $food_notes,
