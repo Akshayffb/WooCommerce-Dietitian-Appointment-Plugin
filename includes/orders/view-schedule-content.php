@@ -52,6 +52,7 @@ function wdb_schedule_endpoint_content()
           <th style="width: 250px;">Meal Info</th>
           <th>Meal Type</th>
           <th>Delivery Time</th>
+          <th>Action</th>
         </tr>
       </thead>
       <tbody>
@@ -94,6 +95,7 @@ function wdb_schedule_endpoint_content()
 
               echo '<td>' . esc_html($meal_types[$i]) . '</td>';
               echo '<td>' . (!empty($delivery_times[$i]) ? esc_html($delivery_times[$i]) : '') . '</td>';
+              echo '<td><button type="button" class="btn btn-primary btn-sm" data-bs-toggle="modal" data-bs-target="#addModal">Add</button></td>';
               echo '</tr>';
             endfor;
           endforeach;
@@ -101,6 +103,26 @@ function wdb_schedule_endpoint_content()
         ?>
       </tbody>
     </table>
+
+    <!-- Bootstrap Modal -->
+    <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+      <div class="modal-dialog modal-dialog-centered">
+        <div class="modal-content">
+          <div class="modal-header">
+            <h5 class="modal-title" id="addModalLabel">Add Item</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <!-- Add your form or content here -->
+            <p>Modal content goes here.</p>
+          </div>
+          <div class="modal-footer">
+            <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
+            <button type="button" class="btn btn-primary">Save changes</button>
+          </div>
+        </div>
+      </div>
+    </div>
   <?php else: ?>
     <p>No meal data available.</p>
 <?php endif;
