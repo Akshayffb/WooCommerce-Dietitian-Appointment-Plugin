@@ -1,8 +1,5 @@
 <?php
 
-// Include create plan file
-include_once(__DIR__ . '/create-plan.php');
-
 // Hook to WooCommerce order completion
 add_action('woocommerce_thankyou', 'wdb_store_order_meta_to_meal_plan_table', 10, 1);
 
@@ -110,11 +107,16 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
         ]);
 
         if ($inserted) {
+            file_put_contents($log_file, "Inserted meal plan for product ID: $product_id\n", FILE_APPEND);
+
             if (function_exists('wdb_generate_plan_schedule')) {
+                file_put_contents($log_file, "Calling wdb_generate_plan_schedule for order ID: $order_id\n", FILE_APPEND);
                 wdb_generate_plan_schedule($order_id);
             } else {
                 file_put_contents($log_file, "Function wdb_generate_plan_schedule does not exist.\n", FILE_APPEND);
             }
+        } else {
+            file_put_contents($log_file, "Failed to insert meal plan for product ID: $product_id\n", FILE_APPEND);
         }
     }
 }

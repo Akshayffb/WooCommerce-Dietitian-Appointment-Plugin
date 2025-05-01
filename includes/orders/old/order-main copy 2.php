@@ -1,8 +1,4 @@
 <?php
-
-// Include create plan file
-include_once(__DIR__ . '/create-plan.php');
-
 // Hook to WooCommerce order completion
 add_action('woocommerce_thankyou', 'wdb_store_order_meta_to_meal_plan_table', 10, 1);
 
@@ -13,12 +9,6 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
     global $wpdb;
     $table = $wpdb->prefix . 'wdb_meal_plans';
 
-    $log_file = __DIR__ . '/meal_plan_debug.log';
-
-    if (!file_exists($log_file)) {
-        file_put_contents($log_file, "Log file created at " . date('Y-m-d H:i:s') . "\n", FILE_APPEND);
-    }
-
     $order = wc_get_order($order_id);
     $user_id = $order->get_user_id();
     $grand_total = (float) $order->get_total();
@@ -26,14 +16,10 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
     foreach ($order->get_items() as $item) {
         $product = $item->get_product();
         $product_name = $item->get_name();
-        $product_id = $product->get_id();
-
-        file_put_contents($log_file, "Product details - ID: $product_id, Name: $product_name\n", FILE_APPEND);
 
         // Default values
         $start_date = '';
         $ingredients = '';
-        $food_notes = '';
         $selected_days = [];
         $meal_type = [];
         $delivery_time = [];
@@ -43,14 +29,8 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
             $meta_key = strtolower($meta->key);
             $meta_value = $meta->value;
 
-            file_put_contents($log_file, "Meta: {$meta_key} => " . print_r($meta_value, true) . "\n", FILE_APPEND);
-
             if ($meta_key === 'start date' && !empty($meta_value)) {
                 $start_date = esc_html($meta_value);
-            }
-
-            if ($meta_key === 'food notes' && !empty($meta_value)) {
-                $food_notes = esc_html($meta_value);
             }
 
             if ($meta_key === 'ingredients' && !empty($meta_value) && is_string($meta_value)) {
@@ -93,12 +73,11 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
         $category_name = !empty($categories) ? $categories[0]->name : '';
 
         // Insert into DB
-        $inserted = $wpdb->insert($table, [
+        $wpdb->insert($table, [
             'order_id'      => $order_id,
-            'product_id' => $product_id,
             'user_id'       => $user_id,
             'plan_name'     => $product_name,
-            'plan_duration' => get_plan_durations($order),
+            'plan_duration' => get_plan_duration($order),
             'category'      => $category_name,
             'start_date'    => date('Y-m-d', strtotime($start_date)),
             'selected_days' => maybe_serialize($selected_days),
@@ -106,20 +85,12 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
             'time'          => implode("\n", $delivery_time),
             'ingredients'   => maybe_serialize($ingredients),
             'grand_total'   => $grand_total,
-            'notes'         => $food_notes,
+            'notes'         => $item->get_meta('food_notes'),
         ]);
-
-        if ($inserted) {
-            if (function_exists('wdb_generate_plan_schedule')) {
-                wdb_generate_plan_schedule($order_id);
-            } else {
-                file_put_contents($log_file, "Function wdb_generate_plan_schedule does not exist.\n", FILE_APPEND);
-            }
-        }
     }
 }
 
-function get_plan_durations($order)
+function get_plan_duration($order)
 {
     foreach ($order->get_items() as $item) {
         $product = $item->get_product();

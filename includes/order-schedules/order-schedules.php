@@ -58,7 +58,7 @@ function custom_view_schedule_content()
     }
 
     // Load the template manually
-    $template = plugin_dir_path(__FILE__) . '/view-schedule.php';
+    $template = plugin_dir_path(__FILE__) . '/view-order-schedule.php';
 
     if (file_exists($template)) {
         include $template;

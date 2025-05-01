@@ -254,7 +254,7 @@ add_filter('woocommerce_account_menu_items', 'wdb_add_my_appointments_menu');
 // Include additional files
 include_once plugin_dir_path(__FILE__) . 'includes/my-appointments.php';
 require_once plugin_dir_path(__FILE__) . 'includes/dietitian-meeting-note.php';
-require_once plugin_dir_path(__FILE__) . 'includes/order-schedules/order-schedules.php';
+// require_once plugin_dir_path(__FILE__) . 'includes/order-schedules/order-schedules.php';
 
 // Flush rewrite rules once after plugin activation
 add_action('admin_init', function () {
@@ -314,4 +314,9 @@ add_action('admin_menu', 'restrict_dietitian_admin_menu', 999);
 
 // Include order-related functionality
 include_once plugin_dir_path(__FILE__) . 'includes/orders/order-main.php';
+// require_once plugin_dir_path(__FILE__) . 'includes/orders/view-order-schedule.php';
+require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-endpoint.php';
+require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-content.php';
+
+// Apis
 require_once plugin_dir_path(__FILE__) . '/includes/apis/api-main.php';

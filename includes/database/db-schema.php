@@ -67,6 +67,7 @@ function wdb_run_schema_updates()
   $sql4 = "CREATE TABLE {$meal_plan_table} (
             id               BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             order_id         BIGINT(20) NOT NULL UNIQUE,
+            product_id       BIGINT(20) NOT NULL,
             user_id          BIGINT(20) NOT NULL,
             plan_name        VARCHAR(255) NOT NULL,
             plan_duration    BIGINT(20) NOT NULL,
@@ -107,7 +108,21 @@ function wdb_run_schema_updates()
             updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) {$charset_collate};";
 
-  /* ----------  EXECUTE WITH dbDelta  ---------- */
+  $tables = [
+    'wdb_appointments',
+    'wdb_dietitians',
+    'wdb_settings',
+    'wdb_meal_plans',
+    'wdb_meal_plan_schedules',
+    'wdb_apis',
+  ];
+
+  // Drop tables first
+  foreach ($tables as $table) {
+    $full_table_name = $wpdb->prefix . $table;
+    $wpdb->query("DROP TABLE IF EXISTS $full_table_name");
+  }
+
   require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
   dbDelta($sql1);

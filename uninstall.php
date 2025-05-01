@@ -16,5 +16,5 @@ $tables = [
 ];
 
 foreach ($tables as $table) {
-    $wpdb->query("DROP TABLE IF EXISTS {$wpdb->prefix}$table");
+    $wpdb->query("DROP TABLE IF EXISTS `{$wpdb->prefix}$table`");
 }
