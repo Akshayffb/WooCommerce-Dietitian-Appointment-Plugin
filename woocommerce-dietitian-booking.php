@@ -204,6 +204,12 @@ function wdb_plugin_activate()
   }
 }
 
+// Add Rewrite Endpoint for My Appointments
+function wdb_add_appointments_endpoint()
+{
+  add_rewrite_endpoint('my-appointments', EP_PAGES);
+}
+
 register_activation_hook(__FILE__, 'wdb_plugin_activate');
 
 // Function to create a unique My Appointments page
@@ -223,12 +229,6 @@ function wdb_create_appointments_page()
   if ($page_id) {
     update_option('wdb_appointments_page_id', $page_id);
   }
-}
-
-// Add Rewrite Endpoint for My Appointments
-function wdb_add_appointments_endpoint()
-{
-  add_rewrite_endpoint('my-appointments', EP_PAGES);
 }
 
 add_action('init', 'wdb_add_appointments_endpoint');
@@ -255,14 +255,6 @@ add_filter('woocommerce_account_menu_items', 'wdb_add_my_appointments_menu');
 include_once plugin_dir_path(__FILE__) . 'includes/my-appointments.php';
 require_once plugin_dir_path(__FILE__) . 'includes/dietitian-meeting-note.php';
 // require_once plugin_dir_path(__FILE__) . 'includes/order-schedules/order-schedules.php';
-
-// Flush rewrite rules once after plugin activation
-add_action('admin_init', function () {
-  if (get_option('wdb_permalinks_flushed') !== 'yes') {
-    flush_rewrite_rules();
-    update_option('wdb_permalinks_flushed', 'yes');
-  }
-});
 
 // Custom login redirect for Dietitian role
 function custom_login_redirect($user_login, $user)
@@ -314,9 +306,25 @@ add_action('admin_menu', 'restrict_dietitian_admin_menu', 999);
 
 // Include order-related functionality
 include_once plugin_dir_path(__FILE__) . 'includes/orders/order-main.php';
-// require_once plugin_dir_path(__FILE__) . 'includes/orders/view-order-schedule.php';
-require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-endpoint.php';
 require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-content.php';
+require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-endpoint.php';
 
 // Apis
 require_once plugin_dir_path(__FILE__) . '/includes/apis/api-main.php';
+
+// Add jquery
+
+function enqueue_custom_scripts()
+{
+  wp_enqueue_script('custom-plugin-js', plugin_dir_url(__FILE__) . 'assets/js/custom.js', array('jquery'), null, true);
+
+  // Localize script to pass AJAX URL and security nonce
+  wp_localize_script('custom-plugin-js', 'customPlugin', array(
+    'ajax_url' => admin_url('admin-ajax.php'),
+    'nonce' => wp_create_nonce('custom_plugin_nonce')
+  ));
+}
+add_action('wp_enqueue_scripts', 'enqueue_custom_scripts');
+
+
+require_once plugin_dir_path(__FILE__) . 'includes/orders/update-schedule-plan.php';
