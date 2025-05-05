@@ -19,7 +19,7 @@ function wdb_run_schema_updates()
   $appointments_table = $wpdb->prefix . 'wdb_appointments';
   $settings_table     = $wpdb->prefix . 'wdb_settings';
   $meal_plan_table    = $wpdb->prefix . 'wdb_meal_plans';
-  $meals_table        = $wpdb->prefix . 'wdb_meal_plan_schedules';
+  $meals_schedule_table        = $wpdb->prefix . 'wdb_meal_plan_schedules';
   $api_table          = $wpdb->prefix . 'wdb_apis';
 
   /* ----------  CREATE STATEMENTS  ---------- */
@@ -83,7 +83,7 @@ function wdb_run_schema_updates()
         ) {$charset_collate};";
 
   /* Meal instances – many per booking */
-  $sql5 = "CREATE TABLE {$meals_table} (
+  $sql5 = "CREATE TABLE {$meals_schedule_table} (
             id              BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
             meal_plan_id    BIGINT(20) UNSIGNED NOT NULL,
             serve_date      DATE NOT NULL,
@@ -91,6 +91,8 @@ function wdb_run_schema_updates()
             meal_info       TEXT NOT NULL, 
             meal_type       VARCHAR(50) NOT NULL,
             delivery_window VARCHAR(50),
+            status          VARCHAR(20) NOT NULL DEFAULT 'active',
+            message         TEXT,
             FOREIGN KEY (meal_plan_id) REFERENCES {$meal_plan_table}(id) ON DELETE CASCADE,
             KEY (meal_plan_id) -- Adding index for better performance
         ) {$charset_collate};";
