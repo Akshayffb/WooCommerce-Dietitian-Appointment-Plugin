@@ -1,8 +1,8 @@
-if (!$) {
+if (typeof jQuery !== "undefined" && typeof $ === "undefined") {
   $ = jQuery;
 }
 
-// $(function () {
+// $(document).ready(function ($) {
 //   $("#updateForm").on("submit", function (event) {
 //     event.preventDefault();
 
@@ -15,6 +15,7 @@ if (!$) {
 //       alert("Please select a valid future date.");
 //       return;
 //     }
+
 //     if (!mealType || !deliveryTime) {
 //       alert("Please select meal type and delivery time.");
 //       return;
@@ -25,32 +26,56 @@ if (!$) {
 //       method: "POST",
 //       data: {
 //         action: "save_update_schedule",
+//         nonce: customPlugin.nonce,
 //         date: date,
 //         weekday: weekday,
 //         meal_type: mealType,
 //         delivery_time: deliveryTime,
-//         nonce: customPlugin.nonce,
 //       },
 //       success: function (response) {
-//         if (response.success) {
-//           alert('yes');
+//         if (response.success && response.data) {
 //           alert(response.data.message);
 //           $("#addModal").modal("hide");
-//           // location.reload();
+//           updateTableRow(response.data);
 //         } else {
-//           alert(response.data.message);
+//           alert(response.data.message || "Failed to update.");
 //         }
-//         updateTableRow(response);
 //       },
 //       error: function (response) {
+//         console.error("AJAX error:", response);
 //         alert("An error occurred. Please try again.");
 //       },
 //     });
 //   });
+
+//   function updateTableRow(data) {
+//     const updatedRow = $("tr[data-id='" + data.id + "']");
+//     updatedRow.find(".meal-type").text(data.meal_type);
+//     updatedRow.find(".delivery-time").text(data.delivery_time);
+//   }
 // });
 
-// function updateTableRow(response) {
-//   const updatedRow = $("tr[data-id='" + response.id + "']");
-//   updatedRow.find(".meal-type").text(response.meal_type);
-//   updatedRow.find(".delivery-time").text(response.delivery_time);
-// }
+// document
+//   .getElementById("updateScheduleForm")
+//   .addEventListener("submit", function (e) {
+//     e.preventDefault();
+
+//     const formData = new FormData(this);
+//     formData.append("action", "update_schedule_entry");
+
+//     console.log("Sending AJAX request...");
+
+//     fetch('<?php echo admin_url("admin-ajax.php"); ?>', {
+//       method: "POST",
+//       body: formData,
+//     })
+//       .then((res) => res.json())
+//       .then((data) => {
+//         console.log("AJAX response:", data);
+//         alert(data.success ? "Updated successfully!" : "Error: " + data.data);
+//       })
+//       .catch((error) => {
+//         console.error("AJAX error:", error);
+//         alert("AJAX request failed.");
+//       });
+//   });

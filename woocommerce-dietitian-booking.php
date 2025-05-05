@@ -314,17 +314,25 @@ require_once plugin_dir_path(__FILE__) . '/includes/apis/api-main.php';
 
 // Add jquery
 
-function enqueue_custom_scripts()
-{
-  wp_enqueue_script('custom-plugin-js', plugin_dir_url(__FILE__) . 'assets/js/custom.js', array('jquery'), null, true);
+// Add this to your theme's functions.php or plugin main file
+// function wdb_schedule_update_endpoint()
+// {
+//   add_rewrite_rule('^process-schedule-update/?$', 'index.php?process_schedule_update=1', 'top');
+//   add_rewrite_tag('%process_schedule_update%', '1');
+// }
+// add_action('init', 'wdb_schedule_update_endpoint');
 
-  // Localize script to pass AJAX URL and security nonce
-  wp_localize_script('custom-plugin-js', 'customPlugin', array(
-    'ajax_url' => admin_url('admin-ajax.php'),
-    'nonce' => wp_create_nonce('custom_plugin_nonce')
-  ));
-}
-add_action('wp_enqueue_scripts', 'enqueue_custom_scripts');
+// function wdb_schedule_update_template_redirect()
+// {
+//   if (get_query_var('process_schedule_update') == 1) {
+//     include get_template_directory() . '/process-schedule-update.php'; // Change path if needed
+//     exit;
+//   }
+// }
+// add_action('template_redirect', 'wdb_schedule_update_template_redirect');
 
 
-require_once plugin_dir_path(__FILE__) . 'includes/orders/update-schedule-plan.php';
+// require_once plugin_dir_path(__FILE__) . 'includes/orders/update-schedule-plan.php';
+
+// Load AJAX logic
+// require_once plugin_dir_path(__FILE__) . '/includes/orders/ajax-update-schedule.php';

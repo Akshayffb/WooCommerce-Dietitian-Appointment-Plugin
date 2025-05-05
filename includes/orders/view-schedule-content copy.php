@@ -40,40 +40,40 @@ function wdb_schedule_endpoint_content()
     }
 
     if (!empty($meal_type) && !empty($delivery)) {
+      // Trim the meal types and delivery windows from the existing entry
       $meal_types = array_map('trim', explode(',', $existing_entry['meal_type']));
       $delivery_windows = array_map('trim', explode(',', $existing_entry['delivery_window']));
 
-      $found = false;
+      $matched = false;
 
-      // Loop to find and update matching meal type
+      // Check for matching meal type and update the corresponding delivery window
       foreach ($meal_types as $i => $type) {
-        if (strtolower($type) === strtolower($meal_type)) {
-          $meal_types[$i] = $meal_type; // Just to ensure formatting
+        if (strtolower(trim($type)) === strtolower(trim($meal_type))) {
+          $meal_types[$i] = $meal_type;
           $delivery_windows[$i] = $delivery;
-          $found = true;
+          $matched = true;
           break;
         }
       }
 
-      // Add new meal type if not found
-      if (!$found) {
-        $meal_types[] = $meal_type;
-        $delivery_windows[] = $delivery;
-        echo "<p class='text-warning'>Meal type not found in schedule. Added new entry.</p>";
+      // If a match is found, update both the meal_type and delivery_window
+      if ($matched) {
+        $data['meal_type'] = implode(', ', $meal_types);
+        $data['delivery_window'] = implode(', ', $delivery_windows);
+        $format[] = '%s';
+        $format[] = '%s';
+      } else {
+        // If no match is found, force update the meal_type and delivery_window
+        $data['meal_type'] = $meal_type;
+        $data['delivery_window'] = $delivery;
+        $format[] = '%s';
+        $format[] = '%s';
+        echo "<p class='text-warning'>Meal type not found in schedule. Only date updated, but meal type and delivery window are updated anyway.</p>";
       }
-
-      $data['meal_type'] = implode(', ', $meal_types);
-      $data['delivery_window'] = implode(', ', $delivery_windows);
-      $data['serve_date'] = $new_date;
-      $format[] = '%s';
-      $format[] = '%s';
     }
 
     // Only update if there's something to update
     if (!empty($data)) {
-      error_log("Updating schedule ID: " . $existing_entry['id']);
-      error_log("Update data: " . print_r($data, true));
-      
       $wpdb->update(
         $schedule_table,
         $data,
@@ -195,7 +195,6 @@ function wdb_schedule_endpoint_content()
           <div class="modal-body">
             <?php wp_nonce_field('update_schedule_action', 'update_schedule_nonce'); ?>
             <input type="hidden" name="order_id" id="modal-order-id">
-            <input type="hidden" name="original_date" id="modal-original-date">
             <div class="d-flex justify-content-between gap-2">
               <div class="mb-3 w-100">
                 <label for="modal-date" class="form-label">Date</label>
@@ -263,7 +262,6 @@ function wdb_schedule_endpoint_content()
         const orderID = $(this).data("order-id");
 
         $("#modal-date").val(date);
-        $("#modal-original-date").val(date);
         $("#modal-weekday").val(weekday);
         $("#modal-meal-type").val(mealType);
         $("#modal-order-id").val(orderID);
