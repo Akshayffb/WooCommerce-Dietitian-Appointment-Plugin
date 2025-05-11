@@ -121,7 +121,6 @@ function wdb_schedule_endpoint_content()
     ARRAY_A
   );
 
-  // Output HTML
 ?>
   <h2 class="fs-4">Meal Plan: <?php echo esc_html($plan['plan_name']); ?></h2>
   <p><strong>Start Date:</strong> <?php echo esc_html($plan['start_date']); ?></p>
@@ -337,7 +336,7 @@ function wdb_schedule_endpoint_content()
         $("#modal-serve-date").val(serveDate);
         $("#reschedule-date").val(serveDate);
 
-        // updateDeliveryOptions(mealType, delivery);
+        updateDeliveryOptions(mealType, delivery);
       });
 
       $("#modal-meal-type").on("change", function() {

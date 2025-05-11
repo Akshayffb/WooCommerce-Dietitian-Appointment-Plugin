@@ -9,10 +9,15 @@ function wdb_schedule_endpoint_content()
   if ($_SERVER['REQUEST_METHOD'] === 'POST' && isset($_POST['update_schedule_nonce']) && wp_verify_nonce($_POST['update_schedule_nonce'], 'update_schedule_action')) {
     $order_id = intval($_POST['order_id']);
     $new_date = sanitize_text_field($_POST['date']);
-    $weekday = sanitize_text_field($_POST['weekday']);
     $meal_type = sanitize_text_field($_POST['meal_type']);
     $delivery = sanitize_text_field($_POST['delivery']);
 
+    if (!isset($meal_plan_table) || !isset($schedule_table)) {
+      echo "<p class='text-danger'>Meal plan table or schedule table not defined.</p>";
+      return;
+    }
+
+    // Fetch the meal plan
     $plan = $wpdb->get_row(
       $wpdb->prepare("SELECT * FROM $meal_plan_table WHERE order_id = %d", $order_id),
       ARRAY_A
@@ -25,63 +30,72 @@ function wdb_schedule_endpoint_content()
 
     $meal_plan_id = $plan['id'];
     $existing_entry = $wpdb->get_row(
-      $wpdb->prepare("SELECT * FROM $schedule_table WHERE meal_plan_id = %d AND weekday = %s", $meal_plan_id, $weekday),
+      $wpdb->prepare("SELECT * FROM $schedule_table WHERE meal_plan_id = %d AND serve_date = %s", $meal_plan_id, $new_date),
       ARRAY_A
     );
 
-    if (!$existing_entry) return;
+    if (!$existing_entry) {
+      echo "<p class='text-warning'>No existing schedule found for this date.</p>";
+      return;
+    }
 
     $data = [];
     $format = [];
 
-    if (!empty($new_date)) {
+    // Only update serve_date if it's changed
+    if (!empty($new_date) && $new_date !== $existing_entry['serve_date']) {
       $data['serve_date'] = $new_date;
       $format[] = '%s';
     }
 
     if (!empty($meal_type) && !empty($delivery)) {
-      // Trim the meal types and delivery windows from the existing entry
       $meal_types = array_map('trim', explode(',', $existing_entry['meal_type']));
       $delivery_windows = array_map('trim', explode(',', $existing_entry['delivery_window']));
 
-      $matched = false;
+      $found = false;
 
-      // Check for matching meal type and update the corresponding delivery window
+      // Find and update the delivery window for the given meal type
       foreach ($meal_types as $i => $type) {
-        if (strtolower(trim($type)) === strtolower(trim($meal_type))) {
-          $meal_types[$i] = $meal_type;
-          $delivery_windows[$i] = $delivery;
-          $matched = true;
+        if (strtolower($type) === strtolower($meal_type)) {
+          if ($delivery_windows[$i] !== $delivery) {
+            $delivery_windows[$i] = $delivery;
+            $data['delivery_window'] = implode(', ', $delivery_windows);
+            $format[] = '%s';
+          }
+          $found = true;
           break;
         }
       }
 
-      // If a match is found, update both the meal_type and delivery_window
-      if ($matched) {
+      // If meal type not found, add it
+      if (!$found) {
+        $meal_types[] = $meal_type;
+        $delivery_windows[] = $delivery;
         $data['meal_type'] = implode(', ', $meal_types);
         $data['delivery_window'] = implode(', ', $delivery_windows);
         $format[] = '%s';
         $format[] = '%s';
-      } else {
-        // If no match is found, force update the meal_type and delivery_window
-        $data['meal_type'] = $meal_type;
-        $data['delivery_window'] = $delivery;
-        $format[] = '%s';
-        $format[] = '%s';
-        echo "<p class='text-warning'>Meal type not found in schedule. Only date updated, but meal type and delivery window are updated anyway.</p>";
+        echo "<p class='text-warning'>Meal type not found in schedule. Added new entry.</p>";
       }
     }
 
-    // Only update if there's something to update
+    // Run the update only if there's something to update
     if (!empty($data)) {
-      $wpdb->update(
+      $rows_updated = $wpdb->update(
         $schedule_table,
         $data,
         ['id' => $existing_entry['id']],
         $format,
         ['%d']
       );
-      echo "<p class='text-success'>Schedule updated successfully.</p>";
+
+      if ($rows_updated === false) {
+        echo "<p class='text-danger'>Error updating the schedule.</p>";
+      } else {
+        echo "<p class='text-success'>Schedule updated successfully.</p>";
+      }
+    } else {
+      echo "<p class='text-muted'>No changes detected.</p>";
     }
   }
 
@@ -107,7 +121,6 @@ function wdb_schedule_endpoint_content()
     ARRAY_A
   );
 
-  // Output HTML
 ?>
   <h2 class="fs-4">Meal Plan: <?php echo esc_html($plan['plan_name']); ?></h2>
   <p><strong>Start Date:</strong> <?php echo esc_html($plan['start_date']); ?></p>
@@ -161,17 +174,27 @@ function wdb_schedule_endpoint_content()
               echo '<td>' . esc_html($meal_types[$i]) . '</td>';
               echo '<td>' . (!empty($delivery_times[$i]) ? esc_html($delivery_times[$i]) : '') . '</td>';
               echo '<td>
-                                <button type="button" class="btn btn-outline-info btn-sm open-add-modal"
-                                    data-bs-toggle="modal"
-                                    data-bs-target="#addModal"
-                                    data-date="' . esc_attr($meal['serve_date']) . '"
-                                    data-weekday="' . esc_attr($meal['weekday']) . '"
-                                    data-order-id="' . esc_attr($order_id) . '"
-                                    data-meal_type="' . esc_attr($meal_types[$i]) . '"
-                                    data-delivery="' . esc_attr($delivery_times[$i] ?? '') . '">
-                                    Update
-                                </button>
-                            </td>';
+              <button type="button" class="btn btn-outline-info btn-sm open-add-modal"
+                  data-bs-toggle="modal"
+                  data-bs-target="#addModal"
+                  data-date="' . esc_attr($meal['serve_date']) . '"
+                  data-weekday="' . esc_attr($meal['weekday']) . '"
+                  data-order-id="' . esc_attr($order_id) . '"
+                  data-meal_type="' . esc_attr($meal_types[$i]) . '"
+                  data-delivery="' . esc_attr($delivery_times[$i] ?? '') . '">
+                  Update
+              </button>
+              <br>
+              <div class="text-center">
+              <a href="#" class="cancel-meal"
+                  data-bs-toggle="modal"
+                  data-bs-target="#cancelModal"
+                  data-meal-id="' . esc_attr($meal['id']) . '"
+                  data-serve-date="' . esc_attr($meal['serve_date']) . '">
+                  Cancel
+              </a>
+              </div>
+          </td>';
               echo '</tr>';
             endfor;
           endforeach;
@@ -195,10 +218,11 @@ function wdb_schedule_endpoint_content()
           <div class="modal-body">
             <?php wp_nonce_field('update_schedule_action', 'update_schedule_nonce'); ?>
             <input type="hidden" name="order_id" id="modal-order-id">
+            <input type="hidden" name="original_date" id="modal-original-date">
             <div class="d-flex justify-content-between gap-2">
               <div class="mb-3 w-100">
                 <label for="modal-date" class="form-label">Date</label>
-                <input type="date" class="form-control" name="date" id="modal-date" required>
+                <input type="date" class="form-control" name="date" id="modal-date" required min="<?php echo date('Y-m-d'); ?>">
                 <div class="invalid-feedback">Date cannot be in the past.</div>
               </div>
               <div class="mb-3 w-100">
@@ -224,6 +248,40 @@ function wdb_schedule_endpoint_content()
           <div class="modal-footer">
             <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">Close</button>
             <button type="submit" class="btn btn-primary">Save Changes</button>
+          </div>
+        </form>
+      </div>
+    </div>
+  </div>
+
+  <!-- Cancel Modal -->
+  <div class="modal fade" id="cancelModal" tabindex="-1" aria-labelledby="cancelModalLabel" aria-hidden="true">
+    <div class="modal-dialog modal-dialog-centered">
+      <div class="modal-content">
+        <form id="cancelMealForm" method="POST">
+          <div class="modal-header">
+            <h5 class="modal-title" id="cancelModalLabel">Cancel Meal</h5>
+            <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
+          </div>
+          <div class="modal-body">
+            <input type="hidden" name="meal_id" id="modal-meal-id">
+            <input type="hidden" name="serve_date" id="modal-serve-date">
+
+            <p>Are you sure you want to cancel the meal scheduled for <strong id="meal-date"></strong>?</p>
+
+            <div id="reschedule-section" class="d-none">
+              <div class="mb-3">
+                <label for="reschedule-date" class="form-label">Reschedule to</label>
+                <input type="date" class="form-control" name="reschedule_date" id="reschedule-date" min="<?php echo date('Y-m-d'); ?>">
+                <div class="invalid-feedback">Please select a valid date.</div>
+              </div>
+            </div>
+          </div>
+
+          <div class="modal-footer">
+            <button type="button" class="btn btn-danger" id="just-cancel">Yes, Cancel</button>
+            <button type="button" class="btn btn-primary" id="show-reschedule">No, Reschedule</button>
+            <button type="submit" class="btn btn-success d-none" id="confirm-reschedule">Confirm Reschedule</button>
           </div>
         </form>
       </div>
@@ -262,9 +320,21 @@ function wdb_schedule_endpoint_content()
         const orderID = $(this).data("order-id");
 
         $("#modal-date").val(date);
+        $("#modal-original-date").val(date);
         $("#modal-weekday").val(weekday);
         $("#modal-meal-type").val(mealType);
         $("#modal-order-id").val(orderID);
+
+        updateDeliveryOptions(mealType, delivery);
+      });
+
+      $(".cancel-meal").on("click", function() {
+        const mealID = $(this).data("meal-id");
+        const serveDate = $(this).data("serve-date");
+
+        $("#modal-meal-id").val(mealID);
+        $("#modal-serve-date").val(serveDate);
+        $("#reschedule-date").val(serveDate);
 
         updateDeliveryOptions(mealType, delivery);
       });
