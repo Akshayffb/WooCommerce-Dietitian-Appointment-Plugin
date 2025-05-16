@@ -1,6 +1,8 @@
 <?php
 
 include_once(__DIR__ . '/update-schedule.php');
+include_once(__DIR__ . '/cancel-schedule.php');
+include_once(__DIR__ . '/reschedule-schedule.php');
 
 
 function wdb_schedule_endpoint_content()
@@ -28,8 +30,21 @@ function wdb_schedule_endpoint_content()
   }
 
   if ($_SERVER['REQUEST_METHOD'] === 'POST') {
-    update_schedule($wpdb);
-    wp_redirect($_SERVER['REQUEST_URI']);
+    if (isset($_POST['form_action'])) {
+      switch ($_POST['form_action']) {
+        case 'cancel_schedule':
+          cancel_schedule($wpdb);
+          break;
+        case 'reschedule_schedule':
+          reschedule_schedule($wpdb);
+          break;
+        case 'update_schedule':
+          update_schedule($wpdb);
+          break;
+      }
+
+      wp_redirect($_SERVER['REQUEST_URI']);
+    }
   }
 
   $meals = $wpdb->get_results(
@@ -127,6 +142,7 @@ function wdb_schedule_endpoint_content()
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <form id="updateScheduleForm" method="POST">
+          <input type="hidden" name="form_action" value="update_schedule">
           <div class="modal-header">
             <h5 class="modal-title">Update Schedule</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
@@ -177,21 +193,46 @@ function wdb_schedule_endpoint_content()
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <form id="cancelMealForm" method="POST">
+          <input type="hidden" name="form_action" value="">
           <div class="modal-header">
             <h5 class="modal-title" id="cancelModalLabel">Cancel Meal</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
+            <?php wp_nonce_field('cancel_or_reschedule_action', 'cancel_reschedule_nonce'); ?>
             <input type="hidden" name="meal_id" id="modal-meal-id">
             <input type="hidden" name="serve_date" id="modal-serve-date">
-
             <p>Are you sure you want to cancel the meal scheduled for <strong id="meal-date"></strong>?</p>
 
             <div id="reschedule-section" class="d-none">
-              <div class="mb-3">
-                <label for="reschedule-date" class="form-label">Reschedule to</label>
-                <input type="date" class="form-control" name="reschedule_date" id="reschedule-date" min="<?php echo date('Y-m-d'); ?>">
-                <div class="invalid-feedback">Please select a valid date.</div>
+              <div class="d-flex justify-content-between gap-2">
+                <div class="mb-3">
+                  <label for="reschedule-date" class="form-label">Reschedule to</label>
+                  <input type="date" class="form-control" name="reschedule_date" id="reschedule-date" min="<?php echo date('Y-m-d'); ?>">
+                  <div class="invalid-feedback">Please select a valid date.</div>
+                </div>
+
+                <div class="mb-3 w-100">
+                  <label for="cancel-modal-weekday" class="form-label">Weekday</label>
+                  <input type="text" class="form-control" name="weekday" id="cancel-modal-weekday" readonly>
+                </div>
+              </div>
+
+              <div class="d-flex justify-content-between gap-2">
+                <div class="mb-3 w-100">
+                  <label for="cancel-modal-meal-type" class="form-label">Meal Type</label>
+                  <input type="hidden" name="cancel_original_meal_type" id="cancel_original_meal_type">
+                  <select class="form-select" name="meal_type" id="cancel-modal-meal-type" required>
+                    <option value="breakfast">Breakfast</option>
+                    <option value="lunch">Lunch</option>
+                    <option value="dinner">Dinner</option>
+                  </select>
+                </div>
+                <div class="mb-3 w-100">
+                  <label for="cancel-modal-delivery" class="form-label">Delivery Time</label>
+                  <input type="hidden" name="original_delivery" id="original_delivery">
+                  <select class="form-select" name="delivery" id="cancel-modal-delivery" required></select>
+                </div>
               </div>
             </div>
           </div>
@@ -216,8 +257,8 @@ function wdb_schedule_endpoint_content()
         dinner: ["7 PM to 9 PM", "9 PM to 11 PM"]
       };
 
-      function updateDeliveryOptions(mealType, selectedDelivery = "") {
-        const deliverySelect = $("#modal-delivery");
+      function updateDeliveryOptions(selectId, mealType, selectedDelivery = "") {
+        const deliverySelect = $(selectId);
         deliverySelect.empty();
         if (deliveryTimeOptions[mealType]) {
           deliveryTimeOptions[mealType].forEach(function(slot) {
@@ -246,7 +287,7 @@ function wdb_schedule_endpoint_content()
 
         $("#original_delivery").val(delivery);
 
-        updateDeliveryOptions(mealType, delivery);
+        updateDeliveryOptions("#modal-delivery", mealType, delivery);
       });
 
       $(".cancel-meal").on("click", function() {
@@ -258,10 +299,53 @@ function wdb_schedule_endpoint_content()
         $("#reschedule-date").val(serveDate);
 
         updateDeliveryOptions(mealType, delivery);
+
+        $("#reschedule-section").addClass("d-none");
+        $("#confirm-reschedule").addClass("d-none");
+        $("#just-cancel").removeClass("d-none");
+        $("#show-reschedule").removeClass("d-none");
+      });
+
+      $("#just-cancel").on("click", function() {
+        $("#cancelMealForm").append('<input type="hidden" name="action" value="cancel">');
+        $('#cancelMealForm input[name="form_action"]').val('cancel_schedule');
+        $("#cancelMealForm").submit();
+      });
+
+      $("#show-reschedule").on("click", function() {
+        $("#reschedule-section").removeClass("d-none");
+        $("#confirm-reschedule").removeClass("d-none");
+        $("#just-cancel").addClass("d-none");
+        $("#show-reschedule").addClass("d-none");
+      });
+
+      $("#confirm-reschedule").on("click", function() {
+        const rescheduleDate = $("#reschedule-date").val();
+        if (!rescheduleDate) {
+          $("#reschedule-date").addClass("is-invalid");
+          return;
+        }
+        $("#reschedule-date").removeClass("is-invalid");
+
+        $("#cancelMealForm").append('<input type="hidden" name="action" value="reschedule">');
+        $('#cancelMealForm input[name="form_action"]').val('reschedule_schedule');
+        $("#cancelMealForm").submit();
       });
 
       $("#modal-meal-type").on("change", function() {
-        updateDeliveryOptions($(this).val());
+        updateDeliveryOptions("#modal-delivery", $(this).val());
+      });
+
+      $("#cancel-modal-meal-type").on("change", function() {
+        updateDeliveryOptions("#cancel-modal-delivery", $(this).val());
+      });
+
+      $("#reschedule-date").on('change', function() {
+        const selectedDate = new Date($(this).val());
+        const weekdayName = selectedDate.toLocaleDateString("en-US", {
+          weekday: "long"
+        });
+        $("#cancel-modal-weekday").val(weekdayName);
       });
 
       $("#modal-date").on("change", function() {
@@ -285,6 +369,7 @@ function wdb_schedule_endpoint_content()
           $("#modal-weekday").val(weekdayName);
         }
       });
+
     });
   </script>
 
