@@ -8,12 +8,17 @@ function update_schedule($wpdb)
   if (isset($_POST['update_schedule_nonce']) && wp_verify_nonce($_POST['update_schedule_nonce'], 'update_schedule_action')) {
 
     $order_id = intval($_POST['order_id']);
+    $record_id = intval($_POST['record_id']);
     $original_date = sanitize_text_field($_POST['original_date']);
     $original_meal_type = sanitize_text_field($_POST['original_meal_type']);
-    $original_delivery = sanitize_text_field($_POST['original_delivery']);
     $new_date = sanitize_text_field($_POST['new-date']);
     $meal_type = sanitize_text_field($_POST['meal_type']);
     $delivery = sanitize_text_field($_POST['delivery']);
+
+    if (empty($order_id) || empty($record_id) || empty($original_date) || empty($new_date) || empty($meal_type) || empty($delivery)) {
+      echo "<p class='text-danger'>All fields are required for update.</p>";
+      return;
+    }
 
     $plan = $wpdb->get_row(
       $wpdb->prepare("SELECT * FROM $meal_plan_table WHERE order_id = %d", $order_id),
@@ -27,7 +32,7 @@ function update_schedule($wpdb)
 
     $meal_plan_id = $plan['id'];
     $existing_entry = $wpdb->get_row(
-      $wpdb->prepare("SELECT * FROM $schedule_table WHERE meal_plan_id = %d AND serve_date = %s", $meal_plan_id, $original_date),
+      $wpdb->prepare("SELECT * FROM $schedule_table WHERE id = %d AND meal_plan_id = %d", $record_id, $meal_plan_id),
       ARRAY_A
     );
 

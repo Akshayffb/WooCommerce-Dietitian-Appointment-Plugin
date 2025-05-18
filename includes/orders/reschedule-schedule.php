@@ -2,7 +2,7 @@
 
 function reschedule_schedule($wpdb)
 {
-  $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
+
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
   $schedule_status_table = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
 
@@ -19,7 +19,11 @@ function reschedule_schedule($wpdb)
     $new_delivery = sanitize_text_field($_POST['new_delivery']);
     $reschedule_message = 'Rescheduled from ' . $serve_date . ' (' . $cancel_original_meal_type . ')';
 
-    // 1. Insert cancel entry into status table
+    if (empty($reschedule_date) || empty($new_weekday) || empty($new_meal_type) || empty($new_delivery)) {
+      echo "<p class='text-danger'>All fields are required for rescheduling.</p>";
+      return;
+    }
+
     $wpdb->insert(
       $schedule_status_table,
       [
@@ -31,7 +35,6 @@ function reschedule_schedule($wpdb)
       ['%d', '%s', '%s', '%s']
     );
 
-    // 2. Insert new row into schedule table
     $inserted = $wpdb->insert(
       $schedule_table,
       [

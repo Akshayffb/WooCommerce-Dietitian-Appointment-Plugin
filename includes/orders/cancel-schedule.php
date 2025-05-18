@@ -3,7 +3,6 @@
 function cancel_schedule($wpdb)
 {
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
-  $schedule_status_table = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
 
   if (isset($_POST['cancel_reschedule_nonce']) && wp_verify_nonce($_POST['cancel_reschedule_nonce'], 'cancel_or_reschedule_action')) {
 
@@ -11,6 +10,11 @@ function cancel_schedule($wpdb)
       $meal_id = intval($_POST['meal_id']);
       $meal_plan_id = intval($_POST['meal_plan_id']);
       $serve_date = sanitize_text_field($_POST['serve_date']);
+
+      if (empty($meal_id) || empty($meal_plan_id) || empty($serve_date)) {
+        echo "<p class='text-danger'>All fields are required for cancel.</p>";
+        return;
+      }
 
       $record = $wpdb->get_row($wpdb->prepare(
         "SELECT * FROM $schedule_table WHERE id = %d AND meal_plan_id = %d AND serve_date = %s",

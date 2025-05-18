@@ -77,7 +77,7 @@ function wdb_schedule_endpoint_content()
   <p><strong>Notes:</strong> <?php echo esc_html($plan['notes']); ?></p>
 
   <h3 class="fs-4 mt-3">Scheduled Meals</h3>
-  <p>Cancellation allowed only before a day or 24 hours before.</p>
+  <p class="mb-1 text-warning">Cancellation or update is only allowed at least 24 hours before the serve date.</p>
   <?php if (!empty($meals)): ?>
     <table class="woocommerce-table shop_table" border="1" cellpadding="8">
       <thead>
@@ -114,14 +114,13 @@ function wdb_schedule_endpoint_content()
                 echo '<div>' . date('d M Y', strtotime($meal['serve_date'])) . '</div>';
 
                 $status = strtolower(trim($meal['status'] ?? 'N/A'));
-                $status_class = 'text-muted'; // default
 
                 if ($status === 'cancelled') {
-                  $status_class = 'text-danger';    // red
+                  $status_class = 'text-danger';
                 } elseif ($status === 'rescheduled') {
-                  $status_class = 'text-warning';   // orange/yellow
+                  $status_class = 'text-warning';
                 } else {
-                  $status_class = 'text-success';   // green
+                  $status_class = 'text-success';
                 }
 
                 echo '<div class="' . $status_class . ' small">' . esc_html($status) . '</div>';
@@ -148,29 +147,40 @@ function wdb_schedule_endpoint_content()
 
               if ($status !== 'cancelled' && $status !== 'rescheduled') {
                 if (empty($status_for_meal_type)) {
-                  echo '
-    <button type="button" class="btn btn-outline-info btn-sm open-add-modal"
-        data-bs-toggle="modal"
-        data-bs-target="#addModal"
-        data-date="' . esc_attr($meal['serve_date']) . '"
-        data-weekday="' . esc_attr($meal['weekday']) . '"
-        data-order-id="' . esc_attr($order_id) . '"
-        data-meal_type="' . esc_attr($meal_types[$i]) . '"
-        data-delivery="' . esc_attr($delivery_times[$i] ?? '') . '">
-        Update
-    </button>
-    <br>
-    <div class="text-center mt-1">
-        <a href="#" class="open-cancel-modal"
-            data-bs-toggle="modal"
-            data-bs-target="#cancelModal"
-            data-meal-id="' . esc_attr($meal['id']) . '"
-            data-meal-plan-id="' . esc_attr($meal['meal_plan_id']) . '"
-            data-meal-type="' . esc_attr($meal_types[$i]) . '"
-            data-serve-date="' . esc_attr($meal['serve_date']) . '">
-            Cancel
-        </a>
-    </div>';
+                  $today = new DateTime();
+                  $serveDate = new DateTime($meal['serve_date']);
+                  $interval = $today->diff($serveDate)->days;
+                  $is_future = $serveDate > $today;
+
+                  // Only allow if the serve date is at least 2 days from today
+                  if ($is_future && $interval > 1) {
+                    echo '
+      <button type="button" class="btn btn-outline-info btn-sm open-update-modal"
+          data-bs-toggle="modal"
+          data-bs-target="#updateModal"
+          data-date="' . esc_attr($meal['serve_date']) . '"
+          data-weekday="' . esc_attr($meal['weekday']) . '"
+          data-order-id="' . esc_attr($order_id) . '"
+          data-record-id="' . esc_attr($meal['id']) . '"
+          data-meal_type="' . esc_attr($meal_types[$i]) . '"
+          data-delivery="' . esc_attr($delivery_times[$i] ?? '') . '">
+          Update
+      </button>
+      <br>
+      <div class="text-center mt-1">
+          <a href="#" class="open-cancel-modal"
+              data-bs-toggle="modal"
+              data-bs-target="#cancelModal"
+              data-meal-id="' . esc_attr($meal['id']) . '"
+              data-meal-plan-id="' . esc_attr($meal['meal_plan_id']) . '"
+              data-meal-type="' . esc_attr($meal_types[$i]) . '"
+              data-serve-date="' . esc_attr($meal['serve_date']) . '">
+              Cancel
+          </a>
+      </div>';
+                  } else {
+                    echo '<span class="text-muted small">Too late to modify</span>';
+                  }
                 } else {
                   echo ucfirst($status_for_meal_type);
                 }
@@ -189,7 +199,7 @@ function wdb_schedule_endpoint_content()
   <?php endif; ?>
 
   <!-- Update Modal -->
-  <div class="modal fade" id="addModal" tabindex="-1" aria-labelledby="addModalLabel" aria-hidden="true">
+  <div class="modal fade" id="updateModal" tabindex="-1" aria-labelledby="updateModalLabel" aria-hidden="true">
     <div class="modal-dialog modal-dialog-centered">
       <div class="modal-content">
         <form id="updateScheduleForm" method="POST">
@@ -201,6 +211,7 @@ function wdb_schedule_endpoint_content()
           <div class="modal-body">
             <?php wp_nonce_field('update_schedule_action', 'update_schedule_nonce'); ?>
             <input type="hidden" name="order_id" id="modal-order-id">
+            <input type="hidden" name="record_id" id="modal-record-id">
             <input type="hidden" name="original_date" id="original_date_selected">
             <div class="d-flex justify-content-between gap-2">
               <div class="mb-3 w-100">
@@ -386,12 +397,13 @@ function wdb_schedule_endpoint_content()
         }
       }
 
-      $(".open-add-modal").on("click", function() {
+      $(".open-update-modal").on("click", function() {
         const date = $(this).data("date");
         const weekday = $(this).data("weekday");
         const mealType = $(this).data("meal_type").toLowerCase();
         const delivery = $(this).data("delivery");
         const orderID = $(this).data("order-id");
+        const recordID = $(this).data("record-id");
 
         $("#modal-date").val(date);
         $("#original_date_selected").val(date);
@@ -399,6 +411,7 @@ function wdb_schedule_endpoint_content()
         $("#modal-meal-type").val(mealType);
         $("#original_meal_type").val(mealType);
         $("#modal-order-id").val(orderID);
+        $("#modal-record-id").val(recordID);
 
         $("#original_delivery").val(delivery);
 
@@ -452,13 +465,29 @@ function wdb_schedule_endpoint_content()
       });
 
       $("#confirm-reschedule").on("click", function() {
-        const rescheduleDate = $("#reschedule-date").val();
-        if (!rescheduleDate) {
-          $("#reschedule-date").addClass("is-invalid");
-          return;
-        }
-        $("#reschedule-date").removeClass("is-invalid");
+        let valid = true;
 
+        // Validate new meal type
+        const newMealType = $("#cancel-modal-weekday").val();
+        if (!newMealType) {
+          $("#cancel-modal-weekday").addClass("is-invalid");
+          valid = false;
+        } else {
+          $("#cancel-modal-weekday").removeClass("is-invalid");
+        }
+
+        // Validate delivery time
+        const newDelivery = $("#cancel-modal-delivery").val();
+        if (!newDelivery) {
+          $("#cancel-modal-delivery").addClass("is-invalid");
+          valid = false;
+        } else {
+          $("#cancel-modal-delivery").removeClass("is-invalid");
+        }
+
+        if (!valid) return;
+
+        // Proceed with form submission
         $("#cancelMealForm").append('<input type="hidden" name="action" value="reschedule">');
         $('#cancelMealForm input[name="form_action"]').val('reschedule_schedule');
         $("#cancelMealForm").submit();
@@ -469,6 +498,7 @@ function wdb_schedule_endpoint_content()
       });
 
       $("#cancel-modal-meal-type").on("change", function() {
+        $("#cancel-modal-delivery").removeClass("is-invalid");
         updateDeliveryOptions("#cancel-modal-delivery", $(this).val());
       });
 
@@ -479,6 +509,7 @@ function wdb_schedule_endpoint_content()
 
       $("#reschedule-date").on('change', function() {
         const cancelMealDate = $("#cancel-meal-date").text().trim();
+        $("#cancel-modal-weekday").removeClass("is-invalid");
         validateDate($(this).val(), cancelMealDate, "#cancel-modal-weekday", this);
       });
     });
