@@ -25,7 +25,7 @@ function reschedule_schedule($wpdb)
       [
         'meal_schedule_id' => $meal_id,
         'meal_type' => $cancel_original_meal_type,
-        'status' => 'cancelled',
+        'status' => 'rescheduled',
         'message' => 'Rescheduled to ' . $reschedule_date . ' (' . $new_meal_type . ')',
       ],
       ['%d', '%s', '%s', '%s']

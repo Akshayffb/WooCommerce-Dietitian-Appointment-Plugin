@@ -11,6 +11,7 @@ function wdb_schedule_endpoint_content()
 
   $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
+  $schedule_status_table = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
 
   $order_id = get_query_var('view-schedule');
 
@@ -51,6 +52,21 @@ function wdb_schedule_endpoint_content()
     $wpdb->prepare("SELECT * FROM $schedule_table WHERE meal_plan_id = %d ORDER BY serve_date ASC", $plan['id']),
     ARRAY_A
   );
+
+  $meal_ids = array_column($meals, 'id');
+
+  $statuses = [];
+  if (!empty($meal_ids)) {
+    $placeholders = implode(',', array_fill(0, count($meal_ids), '%d'));
+    $query = "SELECT meal_schedule_id, meal_type, status FROM $schedule_status_table WHERE meal_schedule_id IN ($placeholders)";
+    $prepared = $wpdb->prepare($query, ...$meal_ids);
+    $results = $wpdb->get_results($prepared, ARRAY_A);
+
+    foreach ($results as $row) {
+      $key = $row['meal_schedule_id'] . '_' . trim($row['meal_type']);
+      $statuses[$key] = $row['status'];
+    }
+  }
 
 ?>
   <h2 class="fs-4">Meal Plan: <?php echo esc_html($plan['plan_name']); ?></h2>
@@ -118,9 +134,21 @@ function wdb_schedule_endpoint_content()
                 }
                 echo '</td>';
               endif;
-              echo '<td>' . esc_html($meal_types[$i] ?? 'N/A') . '</td>';
+
+              echo '<td>';
+              echo esc_html($meal_types[$i] ?? 'N/A');
+
+              echo '</td>';
+
               echo '<td>' . (!empty($delivery_times[$i]) ? esc_html($delivery_times[$i]) : 'N/A') . '</td>';
-              echo '<td>
+              echo '<td>';
+
+              $key = $meal['id'] . '_' . $meal_types[$i];
+              $status_for_meal_type = isset($statuses[$key]) ? strtolower(trim($statuses[$key])) : '';
+
+              if ($status !== 'cancelled' && $status !== 'rescheduled') {
+                if (empty($status_for_meal_type)) {
+                  echo '
     <button type="button" class="btn btn-outline-info btn-sm open-add-modal"
         data-bs-toggle="modal"
         data-bs-target="#addModal"
@@ -142,8 +170,13 @@ function wdb_schedule_endpoint_content()
             data-serve-date="' . esc_attr($meal['serve_date']) . '">
             Cancel
         </a>
-    </div>
-</td>';
+    </div>';
+                } else {
+                  echo ucfirst($status_for_meal_type);
+                }
+              }
+              echo '</td>';
+
               echo '</tr>';
             endfor;
           endforeach;
