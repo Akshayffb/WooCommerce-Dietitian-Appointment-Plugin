@@ -255,7 +255,7 @@ function wdb_schedule_endpoint_content()
 
                 <div class="mb-3 w-100">
                   <label for="cancel-modal-weekday" class="form-label">Weekday</label>
-                  <input type="text" class="form-control" name="new_weekday" id="cancel-modal-weekday" readonly>
+                  <input type="text" class="form-control" name="weekday" id="cancel-modal-weekday" readonly>
                 </div>
               </div>
 
@@ -263,7 +263,7 @@ function wdb_schedule_endpoint_content()
                 <div class="mb-3 w-100">
                   <label for="cancel-modal-meal-type" class="form-label">Meal Type</label>
                   <input type="hidden" name="cancel_original_meal_type" id="cancel_original_meal_type">
-                  <select class="form-select" name="new_meal_type" id="cancel-modal-meal-type" required>
+                  <select class="form-select" name="meal_type" id="cancel-modal-meal-type" required>
                     <option value="breakfast">Breakfast</option>
                     <option value="lunch">Lunch</option>
                     <option value="dinner">Dinner</option>
@@ -271,7 +271,8 @@ function wdb_schedule_endpoint_content()
                 </div>
                 <div class="mb-3 w-100">
                   <label for="cancel-modal-delivery" class="form-label">Delivery Time</label>
-                  <select class="form-select" name="new_delivery" id="cancel-modal-delivery" required></select>
+                  <input type="hidden" name="original_delivery" id="original_delivery">
+                  <select class="form-select" name="delivery" id="cancel-modal-delivery" required></select>
                 </div>
               </div>
             </div>
@@ -336,7 +337,7 @@ function wdb_schedule_endpoint_content()
         const selectedOption = $('input[name="cancel_option"]:checked').val();
         const serveDateText = $("#meal-date").text() || 'selected date';
 
-        if (selectedOption === "reschedule_meal_type") {
+        if (selectedOption === "meal_type") {
           $("#cancelModalLabel").text('Reschedule Meal');
           $("#cancel-modal-text").text("You are rescheduling the selected meal.");
           $("#reschedule-section").removeClass("d-none");
@@ -448,6 +449,56 @@ function wdb_schedule_endpoint_content()
         const cancelMealDate = $("#cancel-meal-date").text().trim();
         validateDate($(this).val(), cancelMealDate, "#cancel-modal-weekday", this);
       });
+
+      //   $("#reschedule-date").on('change', function() {
+      //     const cancelMealDate = $("#cancel-meal-date").text().trim();
+      //     const minDate = new Date(cancelMealDate);
+
+      //     minDate.setHours(0, 0, 0, 0);
+
+      //     const selectedDate = new Date($(this).val());
+      //     selectedDate.setHours(0, 0, 0, 0);
+
+      //     if (selectedDate < minDate) {
+      //       this.setCustomValidity("Date cannot be in the past");
+      //       $(this).addClass("is-invalid");
+      //     } else {
+      //       this.setCustomValidity("");
+      //       $(this).removeClass("is-invalid");
+      //       const weekdayName = selectedDate.toLocaleDateString("en-US", {
+      //         weekday: "long"
+      //       });
+      //       $("#modal-weekday").val(weekdayName);
+      //     }
+
+      //     const weekdayName = selectedDate.toLocaleDateString("en-US", {
+      //       weekday: "long"
+      //     });
+
+      //     $("#cancel-modal-weekday").val(weekdayName);
+      //   });
+
+      //   $("#modal-date").on("change", function() {
+      //     const original_date_selected = $("#original_date_selected").val();
+
+      //     const minDate = new Date(original_date_selected);
+      //     minDate.setHours(0, 0, 0, 0);
+
+      //     const selectedDate = new Date($(this).val());
+      //     selectedDate.setHours(0, 0, 0, 0);
+
+      //     if (selectedDate < minDate) {
+      //       this.setCustomValidity("Date cannot be in the past");
+      //       $(this).addClass("is-invalid");
+      //     } else {
+      //       this.setCustomValidity("");
+      //       $(this).removeClass("is-invalid");
+      //       const weekdayName = selectedDate.toLocaleDateString("en-US", {
+      //         weekday: "long"
+      //       });
+      //       $("#modal-weekday").val(weekdayName);
+      //     }
+      //   });
     });
   </script>
 

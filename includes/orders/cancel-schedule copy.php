@@ -5,6 +5,9 @@ function cancel_schedule($wpdb)
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
   $schedule_status_table = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
 
+  // Log the POST data
+  // file_put_contents(__DIR__ . '/cancel_log.txt', print_r($_POST, true), FILE_APPEND);
+
   if (isset($_POST['cancel_reschedule_nonce']) && wp_verify_nonce($_POST['cancel_reschedule_nonce'], 'cancel_or_reschedule_action')) {
 
     if (!empty($_POST['meal_id']) && !empty($_POST['meal_plan_id']) && !empty($_POST['serve_date'])) {

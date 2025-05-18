@@ -121,29 +121,28 @@ function wdb_schedule_endpoint_content()
               echo '<td>' . esc_html($meal_types[$i] ?? 'N/A') . '</td>';
               echo '<td>' . (!empty($delivery_times[$i]) ? esc_html($delivery_times[$i]) : 'N/A') . '</td>';
               echo '<td>
-    <button type="button" class="btn btn-outline-info btn-sm open-add-modal"
-        data-bs-toggle="modal"
-        data-bs-target="#addModal"
-        data-date="' . esc_attr($meal['serve_date']) . '"
-        data-weekday="' . esc_attr($meal['weekday']) . '"
-        data-order-id="' . esc_attr($order_id) . '"
-        data-meal_type="' . esc_attr($meal_types[$i]) . '"
-        data-delivery="' . esc_attr($delivery_times[$i] ?? '') . '">
-        Update
-    </button>
-    <br>
-    <div class="text-center mt-1">
-        <a href="#" class="open-cancel-modal"
-            data-bs-toggle="modal"
-            data-bs-target="#cancelModal"
-            data-meal-id="' . esc_attr($meal['id']) . '"
-            data-meal-plan-id="' . esc_attr($meal['meal_plan_id']) . '"
-            data-meal-type="' . esc_attr($meal_types[$i]) . '"
-            data-serve-date="' . esc_attr($meal['serve_date']) . '">
-            Cancel
-        </a>
-    </div>
-</td>';
+                                <button type="button" class="btn btn-outline-info btn-sm open-add-modal"
+                                    data-bs-toggle="modal"
+                                    data-bs-target="#addModal"
+                                    data-date="' . esc_attr($meal['serve_date']) . '"
+                                    data-weekday="' . esc_attr($meal['weekday']) . '"
+                                    data-order-id="' . esc_attr($order_id) . '"
+                                    data-meal_type="' . esc_attr($meal_types[$i]) . '"
+                                    data-delivery="' . esc_attr($delivery_times[$i] ?? '') . '">
+                                    Update
+                                </button>
+                                <br>
+                                <div class="text-center">
+              <a href="#" class="cancel-meal"
+                  data-bs-toggle="modal"
+                  data-bs-target="#cancelModal"
+                  data-meal-id="' . esc_attr($meal['id']) . '"
+                  data-meal-plan-id="' . esc_html($meal['meal_plan_id']) . '"
+                  data-serve-date="' . esc_attr($meal['serve_date']) . '">
+                  Cancel
+              </a>
+              </div>
+                            </td>';
               echo '</tr>';
             endfor;
           endforeach;
@@ -213,10 +212,7 @@ function wdb_schedule_endpoint_content()
         <form id="cancelMealForm" method="POST">
           <input type="hidden" name="form_action" value="">
           <div class="modal-header">
-            <div class="d-flex flex-column">
-              <h5 class="modal-title" id="cancelModalLabel">Cancel Meal </h5>
-              <p id="cancel-meal-date" class="mb-0" style="color: #666;"></p>
-            </div>
+            <h5 class="modal-title" id="cancelModalLabel">Cancel Meal</h5>
             <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
           </div>
           <div class="modal-body">
@@ -224,7 +220,7 @@ function wdb_schedule_endpoint_content()
             <input type="hidden" name="meal_id" id="modal-meal-id">
             <input type="hidden" name="meal_plan_id" id="modal-meal-plan-id">
             <input type="hidden" name="serve_date" id="modal-serve-date">
-            <p id="cancel-modal-text">Are you sure you want to cancel the selected meal?</p>
+            <p>Are you sure you want to cancel the meal scheduled for <strong id="meal-date"></strong>?</p>
 
             <div class="mb-3">
               <label class="form-label">Cancel Option</label>
@@ -234,13 +230,8 @@ function wdb_schedule_endpoint_content()
                   <label class="form-check-label" for="cancel-full-day">Cancel entire day</label>
                 </div>
                 <div class="form-check">
-                  <input class="form-check-input cancel-option" type="radio" name="cancel_option" id="cancel-meal-type" value="reschedule_meal_type">
-                  <label class="form-check-label" for="cancel-meal-type" id="selected-meal-type">
-                  </label>
-                </div>
-                <div class="form-check">
-                  <input class="form-check-input cancel-option" type="radio" name="cancel_option" id="reschedule-full-day" value="reschedule_entire_day" checked>
-                  <label class="form-check-label" for="reschedule-full-day">Reschedule entire day</label>
+                  <input class="form-check-input cancel-option" type="radio" name="cancel_option" id="cancel-meal-type" value="meal_type">
+                  <label class="form-check-label" for="cancel-meal-type">Cancel specific meal type</label>
                 </div>
               </div>
             </div>
@@ -249,13 +240,13 @@ function wdb_schedule_endpoint_content()
               <div class="d-flex justify-content-between gap-2">
                 <div class="mb-3">
                   <label for="reschedule-date" class="form-label">Reschedule to</label>
-                  <input type="date" class="form-control" name="reschedule_date" id="reschedule-date">
-                  <div class="invalid-feedback">Date cannot be in the past.</div>
+                  <input type="date" class="form-control" name="reschedule_date" id="reschedule-date" min="<?php echo date('Y-m-d'); ?>">
+                  <div class="invalid-feedback">Please select a valid date.</div>
                 </div>
 
                 <div class="mb-3 w-100">
                   <label for="cancel-modal-weekday" class="form-label">Weekday</label>
-                  <input type="text" class="form-control" name="new_weekday" id="cancel-modal-weekday" readonly>
+                  <input type="text" class="form-control" name="weekday" id="cancel-modal-weekday" readonly>
                 </div>
               </div>
 
@@ -263,7 +254,7 @@ function wdb_schedule_endpoint_content()
                 <div class="mb-3 w-100">
                   <label for="cancel-modal-meal-type" class="form-label">Meal Type</label>
                   <input type="hidden" name="cancel_original_meal_type" id="cancel_original_meal_type">
-                  <select class="form-select" name="new_meal_type" id="cancel-modal-meal-type" required>
+                  <select class="form-select" name="meal_type" id="cancel-modal-meal-type" required>
                     <option value="breakfast">Breakfast</option>
                     <option value="lunch">Lunch</option>
                     <option value="dinner">Dinner</option>
@@ -271,7 +262,8 @@ function wdb_schedule_endpoint_content()
                 </div>
                 <div class="mb-3 w-100">
                   <label for="cancel-modal-delivery" class="form-label">Delivery Time</label>
-                  <select class="form-select" name="new_delivery" id="cancel-modal-delivery" required></select>
+                  <input type="hidden" name="original_delivery" id="original_delivery">
+                  <select class="form-select" name="delivery" id="cancel-modal-delivery" required></select>
                 </div>
               </div>
             </div>
@@ -279,6 +271,7 @@ function wdb_schedule_endpoint_content()
 
           <div class="modal-footer">
             <button type="button" class="btn btn-danger" id="just-cancel">Yes, Cancel</button>
+            <button type="button" class="btn btn-primary" id="show-reschedule">No, Reschedule</button>
             <button type="submit" class="btn btn-success d-none" id="confirm-reschedule">Confirm Reschedule</button>
           </div>
         </form>
@@ -310,49 +303,6 @@ function wdb_schedule_endpoint_content()
         }
       }
 
-      function validateDate(selectedDateStr, minDateStr, weekdayOutputSelector, inputElement) {
-        const minDate = new Date(minDateStr);
-        minDate.setHours(0, 0, 0, 0);
-
-        const selectedDate = new Date(selectedDateStr);
-        selectedDate.setHours(0, 0, 0, 0);
-
-        if (selectedDate < minDate) {
-          inputElement.setCustomValidity("Date cannot be in the past");
-          $(inputElement).addClass("is-invalid");
-        } else {
-          inputElement.setCustomValidity("");
-          $(inputElement).removeClass("is-invalid");
-          if (weekdayOutputSelector) {
-            const weekdayName = selectedDate.toLocaleDateString("en-US", {
-              weekday: "long"
-            });
-            $(weekdayOutputSelector).val(weekdayName);
-          }
-        }
-      }
-
-      function updateModalTextAndSections() {
-        const selectedOption = $('input[name="cancel_option"]:checked').val();
-        const serveDateText = $("#meal-date").text() || 'selected date';
-
-        if (selectedOption === "reschedule_meal_type") {
-          $("#cancelModalLabel").text('Reschedule Meal');
-          $("#cancel-modal-text").text("You are rescheduling the selected meal.");
-          $("#reschedule-section").removeClass("d-none");
-          $("#confirm-reschedule").removeClass("d-none");
-          $("#just-cancel").addClass("d-none");
-          $("#show-reschedule").addClass("d-none");
-        } else {
-          $("#cancelModalLabel").text('Cancel Meal');
-          $("#cancel-modal-text").text("Are you sure you want to cancel the selected meal?");
-          $("#reschedule-section").addClass("d-none");
-          $("#confirm-reschedule").addClass("d-none");
-          $("#just-cancel").removeClass("d-none");
-          $("#show-reschedule").removeClass("d-none");
-        }
-      }
-
       $(".open-add-modal").on("click", function() {
         const date = $(this).data("date");
         const weekday = $(this).data("weekday");
@@ -372,43 +322,28 @@ function wdb_schedule_endpoint_content()
         updateDeliveryOptions("#modal-delivery", mealType, delivery);
       });
 
-      $(".open-cancel-modal").on("click", function() {
+      $(".cancel-meal").on("click", function() {
         const mealID = $(this).data("meal-id");
         const serveDate = $(this).data("serve-date");
         const mealPlanId = $(this).data("meal-plan-id");
-        const mealType = $(this).data("meal-type");
 
         $("#modal-meal-id").val(mealID);
         $("#modal-meal-plan-id").val(mealPlanId);
         $("#modal-serve-date").val(serveDate);
         $("#reschedule-date").val(serveDate);
-        $("#cancel_original_meal_type").val(mealType);
-        $("#meal-date").text(serveDate);
-        $("#cancel-meal-date").text(serveDate);
-        $("#selected-meal-type").text(`Cancel Only ${mealType}`);
 
-        $("#cancel-full-day").prop("checked", true);
+        updateDeliveryOptions(mealType, delivery);
 
-        updateModalTextAndSections();
+        $("#reschedule-section").addClass("d-none");
+        $("#confirm-reschedule").addClass("d-none");
+        $("#just-cancel").removeClass("d-none");
+        $("#show-reschedule").removeClass("d-none");
       });
 
       $("#just-cancel").on("click", function() {
-        const selectedOption = $('input[name="cancel_option"]:checked').val();
-
-        if (selectedOption === "full_day") {
-          $("#cancelMealForm").append('<input type="hidden" name="action" value="cancel">');
-          $('#cancelMealForm input[name="form_action"]').val('cancel_schedule');
-          $("#cancelMealForm").submit();
-        } else {
-          $("#reschedule-section").removeClass("d-none");
-          $("#confirm-reschedule").removeClass("d-none");
-          $("#just-cancel").addClass("d-none");
-          $("#show-reschedule").addClass("d-none");
-        }
-      });
-
-      $('input[name="cancel_option"]').on('change', function() {
-        updateModalTextAndSections();
+        $("#cancelMealForm").append('<input type="hidden" name="action" value="cancel">');
+        $('#cancelMealForm input[name="form_action"]').val('cancel_schedule');
+        $("#cancelMealForm").submit();
       });
 
       $("#show-reschedule").on("click", function() {
@@ -439,15 +374,36 @@ function wdb_schedule_endpoint_content()
         updateDeliveryOptions("#cancel-modal-delivery", $(this).val());
       });
 
-      $("#modal-date").on("change", function() {
-        const originalDateSelected = $("#original_date_selected").val();
-        validateDate($(this).val(), originalDateSelected, "#modal-weekday", this);
+      $("#reschedule-date").on('change', function() {
+        const selectedDate = new Date($(this).val());
+        const weekdayName = selectedDate.toLocaleDateString("en-US", {
+          weekday: "long"
+        });
+        $("#cancel-modal-weekday").val(weekdayName);
       });
 
-      $("#reschedule-date").on('change', function() {
-        const cancelMealDate = $("#cancel-meal-date").text().trim();
-        validateDate($(this).val(), cancelMealDate, "#cancel-modal-weekday", this);
+      $("#modal-date").on("change", function() {
+        const original_date_selected = $("#original_date_selected").val();
+
+        const minDate = new Date(original_date_selected);
+        minDate.setHours(0, 0, 0, 0);
+
+        const selectedDate = new Date($(this).val());
+        selectedDate.setHours(0, 0, 0, 0);
+
+        if (selectedDate < minDate) {
+          this.setCustomValidity("Date cannot be in the past");
+          $(this).addClass("is-invalid");
+        } else {
+          this.setCustomValidity("");
+          $(this).removeClass("is-invalid");
+          const weekdayName = selectedDate.toLocaleDateString("en-US", {
+            weekday: "long"
+          });
+          $("#modal-weekday").val(weekdayName);
+        }
       });
+
     });
   </script>
 
