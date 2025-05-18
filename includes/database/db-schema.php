@@ -22,6 +22,7 @@ function wdb_run_schema_updates()
   $meals_schedule_table   = $wpdb->prefix . 'wdb_meal_plan_schedules';
   $meal_status_table      = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
   $api_table              = $wpdb->prefix . 'wdb_apis';
+  $api_log_table          = $wpdb->prefix . 'wdb_api_logs';
 
   $tables = [
     $dietitians_table,
@@ -133,6 +134,17 @@ function wdb_run_schema_updates()
             updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
         ) {$charset_collate};";
 
+  $sql8 = "CREATE TABLE {$api_log_table} (
+  id BIGINT UNSIGNED AUTO_INCREMENT PRIMARY KEY,
+  api_slug VARCHAR(100),
+  request_payload LONGTEXT,
+  response_text LONGTEXT,
+  status_code INT,
+  error_message TEXT,
+  created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+);
+";
+
   require_once ABSPATH . 'wp-admin/includes/upgrade.php';
 
   dbDelta($sql1);
@@ -142,6 +154,7 @@ function wdb_run_schema_updates()
   dbDelta($sql5);
   dbDelta($sql6);
   dbDelta($sql7);
+  dbDelta($sql8);
 
   if ($wpdb->last_error) {
     error_log('WDB DB Error: ' . $wpdb->last_error);

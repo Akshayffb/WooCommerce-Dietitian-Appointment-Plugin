@@ -65,29 +65,24 @@ function cancel_schedule($wpdb)
  */
 function send_cancel_schedule_api($api_table, $wpdb, $data)
 {
+  $api_slug = 'cancel-schedule';
+  
   $log_file = __DIR__ . '/cancel_schedule_log.txt';
-  $log_prefix = "[" . date('Y-m-d H:i:s') . "]";
-
-  file_put_contents($log_file, "$log_prefix send_cancel_schedule_api called\n", FILE_APPEND);
 
   $api = $wpdb->get_row(
-    $wpdb->prepare("SELECT * FROM $api_table WHERE api_slug = %s AND is_active = 1 LIMIT 1", 'cancel-schedule'),
+    $wpdb->prepare("SELECT * FROM $api_table WHERE api_slug = %s AND is_active = 1 LIMIT 1", $api_slug),
     ARRAY_A
   );
 
   if (!$api) {
-    file_put_contents($log_file, "$log_prefix API config for cancel-schedule not found.\n", FILE_APPEND);
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API config for $api_slug not found.\n", FILE_APPEND);
     return;
   }
-
-  file_put_contents($log_file, "$log_prefix API config found: " . print_r($api, true) . "\n", FILE_APPEND);
 
   $headers = json_decode($api['headers'], true);
   if (!is_array($headers)) {
     $headers = [];
   }
-
-  // Add API key to headers
   $headers['X-API-Key'] = $api['api_key'];
 
   $curl_headers = [];
@@ -97,11 +92,7 @@ function send_cancel_schedule_api($api_table, $wpdb, $data)
 
   $payload = json_encode($data);
 
-  file_put_contents($log_file, "$log_prefix Headers prepared:\n" . implode("\n", $curl_headers) . "\n", FILE_APPEND);
-  file_put_contents($log_file, "$log_prefix Payload:\n$payload\n", FILE_APPEND);
-
-  // Uncomment below to enable live API call
-  /*
+  // Make the actual API request
   $ch = curl_init($api['endpoint']);
   curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
   curl_setopt($ch, CURLOPT_HTTPHEADER, $curl_headers);
@@ -109,14 +100,24 @@ function send_cancel_schedule_api($api_table, $wpdb, $data)
   curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
 
   $response = curl_exec($ch);
-  $error = curl_error($ch);
+  $http_code = curl_getinfo($ch, CURLINFO_HTTP_CODE);
+  $curl_error = curl_error($ch);
   curl_close($ch);
 
-  file_put_contents($log_file, "$log_prefix API response: $response\n", FILE_APPEND);
-  if ($error) {
-    file_put_contents($log_file, "$log_prefix CURL error: $error\n", FILE_APPEND);
-  }
-  */
+  // Insert API call log
+  $wpdb->insert(
+    $wpdb->prefix . 'wdb_api_logs',
+    [
+      'api_slug' => $api_slug,
+      'request_payload' => $payload,
+      'response_text' => $response ?: '',
+      'status_code' => $http_code ?: 0,
+      'error_message' => $curl_error ?: null,
+      'created_at' => current_time('mysql'),
+    ],
+    ['%s', '%s', '%s', '%d', '%s', '%s']
+  );
 
-  file_put_contents($log_file, "$log_prefix API call skipped (endpoint offline).\n\n", FILE_APPEND);
+  // Also keep file logs if needed
+  file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API called, status: $http_code, error: $curl_error\n", FILE_APPEND);
 }
