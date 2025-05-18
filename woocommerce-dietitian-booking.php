@@ -93,6 +93,16 @@ function wdb_add_admin_menu()
   );
 
   add_submenu_page(
+    null,
+    'API Detail',
+    'API Detail',
+    'manage_options',
+    'wdb-api-detail',
+    'wdb_api_detail_page'
+  );
+
+
+  add_submenu_page(
     'wdb-all-appointments',
     'Settings',
     'Settings',
@@ -175,6 +185,22 @@ function wdb_display_add_dietitian()
 function wdb_settings_page()
 {
   include_once plugin_dir_path(__FILE__) . 'includes/settings.php';
+}
+
+// APIs
+function wdb_list_apis_page()
+{
+  include_once plugin_dir_path(__FILE__) . 'includes/apis/list-apis.php';
+}
+
+function wdb_add_api_page()
+{
+  include_once plugin_dir_path(__FILE__) . 'includes/apis/add-apis.php';
+}
+
+function wdb_api_detail_page()
+{
+  include_once plugin_dir_path(__FILE__) . 'includes/apis/api-detail.php';
 }
 
 require_once plugin_dir_path(__FILE__) . 'includes/components/shortcodes.php';
@@ -308,31 +334,3 @@ add_action('admin_menu', 'restrict_dietitian_admin_menu', 999);
 include_once plugin_dir_path(__FILE__) . 'includes/orders/order-main.php';
 require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-content.php';
 require_once plugin_dir_path(__FILE__) . 'includes/orders/view-schedule-endpoint.php';
-
-// Apis
-require_once plugin_dir_path(__FILE__) . '/includes/apis/api-main.php';
-
-// Add jquery
-
-// Add this to your theme's functions.php or plugin main file
-// function wdb_schedule_update_endpoint()
-// {
-//   add_rewrite_rule('^process-schedule-update/?$', 'index.php?process_schedule_update=1', 'top');
-//   add_rewrite_tag('%process_schedule_update%', '1');
-// }
-// add_action('init', 'wdb_schedule_update_endpoint');
-
-// function wdb_schedule_update_template_redirect()
-// {
-//   if (get_query_var('process_schedule_update') == 1) {
-//     include get_template_directory() . '/process-schedule-update.php'; // Change path if needed
-//     exit;
-//   }
-// }
-// add_action('template_redirect', 'wdb_schedule_update_template_redirect');
-
-
-// require_once plugin_dir_path(__FILE__) . 'includes/orders/update-schedule-plan.php';
-
-// Load AJAX logic
-// require_once plugin_dir_path(__FILE__) . '/includes/orders/ajax-update-schedule.php';

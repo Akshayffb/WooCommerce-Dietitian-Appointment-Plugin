@@ -3,51 +3,120 @@
 function cancel_schedule($wpdb)
 {
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
+  $api_table = $wpdb->prefix . 'wdb_apis';
 
   if (isset($_POST['cancel_reschedule_nonce']) && wp_verify_nonce($_POST['cancel_reschedule_nonce'], 'cancel_or_reschedule_action')) {
 
-    if (!empty($_POST['meal_id']) && !empty($_POST['meal_plan_id']) && !empty($_POST['serve_date'])) {
-      $meal_id = intval($_POST['meal_id']);
-      $meal_plan_id = intval($_POST['meal_plan_id']);
-      $serve_date = sanitize_text_field($_POST['serve_date']);
+    $meal_id = isset($_POST['meal_id']) ? intval($_POST['meal_id']) : 0;
+    $meal_plan_id = isset($_POST['meal_plan_id']) ? intval($_POST['meal_plan_id']) : 0;
+    $serve_date = isset($_POST['serve_date']) ? sanitize_text_field($_POST['serve_date']) : '';
 
-      if (empty($meal_id) || empty($meal_plan_id) || empty($serve_date)) {
-        echo "<p class='text-danger'>All fields are required for cancel.</p>";
-        return;
-      }
+    if (!$meal_id || !$meal_plan_id || empty($serve_date)) {
+      echo "<p class='text-danger'>All fields are required for cancel.</p>";
+      return;
+    }
 
-      $record = $wpdb->get_row($wpdb->prepare(
-        "SELECT * FROM $schedule_table WHERE id = %d AND meal_plan_id = %d AND serve_date = %s",
-        $meal_id,
-        $meal_plan_id,
-        $serve_date
-      ));
+    $record = $wpdb->get_row($wpdb->prepare(
+      "SELECT * FROM $schedule_table WHERE id = %d AND meal_plan_id = %d AND serve_date = %s",
+      $meal_id,
+      $meal_plan_id,
+      $serve_date
+    ));
 
-      if ($record) {
-        $updated = $wpdb->update(
-          $schedule_table,
-          ['status' => 'cancelled'],
-          [
-            'id' => $meal_id,
-            'meal_plan_id' => $meal_plan_id,
-            'serve_date' => $serve_date
-          ],
-          ['%s'],
-          ['%d', '%d', '%s']
-        );
+    if (!$record) {
+      echo "<p class='text-warning'>No matching schedule found.</p>";
+      return;
+    }
 
-        if ($updated !== false) {
-          echo "<p class='text-success'>Schedule cancelled successfully.</p>";
-        } else {
-          echo "<p class='text-danger'>No changes made to the schedule.</p>";
-        }
-      } else {
-        echo "<p class='text-warning'>No matching schedule found.</p>";
-      }
+    $updated = $wpdb->update(
+      $schedule_table,
+      ['status' => 'cancelled'],
+      ['id' => $meal_id, 'meal_plan_id' => $meal_plan_id, 'serve_date' => $serve_date],
+      ['%s'],
+      ['%d', '%d', '%s']
+    );
+
+    if ($updated !== false) {
+      echo "<p class='text-success'>Schedule cancelled successfully.</p>";
+
+      $updated_data = [
+        'id' => $meal_id,
+        'meal_plan_id' => $meal_plan_id,
+        'serve_date' => $serve_date,
+        'status' => 'cancelled',
+      ];
+
+      send_cancel_schedule_api($api_table, $wpdb, $updated_data);
     } else {
-      echo "<p class='text-danger'>Missing required fields.</p>";
+      echo "<p class='text-danger'>No changes made to the schedule.</p>";
     }
   } else {
     echo "<p class='text-muted'>Invalid request.</p>";
   }
+}
+
+
+/**
+ * Sends the cancel schedule data to an external API.
+ *
+ * @param string $api_table The API table name
+ * @param wpdb $wpdb The WordPress DB instance
+ * @param array $data The cancel schedule data to send
+ */
+function send_cancel_schedule_api($api_table, $wpdb, $data)
+{
+  $log_file = __DIR__ . '/cancel_schedule_log.txt';
+  $log_prefix = "[" . date('Y-m-d H:i:s') . "]";
+
+  file_put_contents($log_file, "$log_prefix send_cancel_schedule_api called\n", FILE_APPEND);
+
+  $api = $wpdb->get_row(
+    $wpdb->prepare("SELECT * FROM $api_table WHERE api_slug = %s AND is_active = 1 LIMIT 1", 'cancel-schedule'),
+    ARRAY_A
+  );
+
+  if (!$api) {
+    file_put_contents($log_file, "$log_prefix API config for cancel-schedule not found.\n", FILE_APPEND);
+    return;
+  }
+
+  file_put_contents($log_file, "$log_prefix API config found: " . print_r($api, true) . "\n", FILE_APPEND);
+
+  $headers = json_decode($api['headers'], true);
+  if (!is_array($headers)) {
+    $headers = [];
+  }
+
+  // Add API key to headers
+  $headers['X-API-Key'] = $api['api_key'];
+
+  $curl_headers = [];
+  foreach ($headers as $key => $value) {
+    $curl_headers[] = "$key: $value";
+  }
+
+  $payload = json_encode($data);
+
+  file_put_contents($log_file, "$log_prefix Headers prepared:\n" . implode("\n", $curl_headers) . "\n", FILE_APPEND);
+  file_put_contents($log_file, "$log_prefix Payload:\n$payload\n", FILE_APPEND);
+
+  // Uncomment below to enable live API call
+  /*
+  $ch = curl_init($api['endpoint']);
+  curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+  curl_setopt($ch, CURLOPT_HTTPHEADER, $curl_headers);
+  curl_setopt($ch, CURLOPT_POST, true);
+  curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+
+  $response = curl_exec($ch);
+  $error = curl_error($ch);
+  curl_close($ch);
+
+  file_put_contents($log_file, "$log_prefix API response: $response\n", FILE_APPEND);
+  if ($error) {
+    file_put_contents($log_file, "$log_prefix CURL error: $error\n", FILE_APPEND);
+  }
+  */
+
+  file_put_contents($log_file, "$log_prefix API call skipped (endpoint offline).\n\n", FILE_APPEND);
 }

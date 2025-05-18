@@ -4,6 +4,7 @@ function update_schedule($wpdb)
 {
   $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
+  $api_table = $wpdb->prefix . 'wdb_apis';
 
   if (isset($_POST['update_schedule_nonce']) && wp_verify_nonce($_POST['update_schedule_nonce'], 'update_schedule_action')) {
 
@@ -99,17 +100,150 @@ function update_schedule($wpdb)
         ['%d']
       );
 
-      if ($rows_updated === false) {
-        echo "<p class='text-danger'>Error updating the schedule. Please try again later.</p>";
-      } else {
+      if ($rows_updated !== false) {
+
         if (!empty($messages)) {
           echo "<p class='text-success'>" . implode(' ', $messages) . "</p>";
         } else {
           echo "<p class='text-success'>Schedule updated successfully.</p>";
         }
+
+        $updated_data = array_merge($existing_entry, $data);
+        send_schedule_update_api($api_table, $wpdb, $updated_data);
+      } else {
+        echo "<p class='text-danger'>Error updating the schedule. Please try again later.</p>";
       }
     } else {
       echo "<p class='text-muted'>No changes detected.</p>";
     }
   }
 }
+
+
+
+/**
+ * Sends the updated schedule data to an external API.
+ * For now, logs the data to a file before sending.
+ *
+ * @param array $data Updated schedule data
+ */
+
+function send_schedule_update_api($api_table, $wpdb, $data)
+{
+  $log_file = __DIR__ . '/schedule_update_log.txt';
+
+  file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] send_schedule_update_api called\n", FILE_APPEND);
+
+  $api = $wpdb->get_row(
+    $wpdb->prepare("SELECT * FROM $api_table WHERE api_slug = %s AND is_active = 1 LIMIT 1", 'update-schedule'),
+    ARRAY_A
+  );
+
+  if (!$api) {
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API config for update-schedule not found.\n", FILE_APPEND);
+    return;
+  }
+
+  file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API config found: " . print_r($api, true) . "\n", FILE_APPEND);
+
+  $headers = json_decode($api['headers'], true);
+  if (!is_array($headers)) {
+    $headers = [];
+  }
+
+  $headers['X-API-Key'] = $api['api_key'];
+
+  $curl_headers = [];
+  foreach ($headers as $key => $value) {
+    $curl_headers[] = $key . ': ' . $value;
+  }
+
+  file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Headers prepared for request:\n" . implode("\n", $curl_headers) . "\n", FILE_APPEND);
+
+  $payload = json_encode($data);
+  file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Payload prepared for request:\n" . $payload . "\n", FILE_APPEND);
+
+  // Uncomment to make the real API call when ready
+  /*
+    $ch = curl_init($api['endpoint']);
+    curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+    curl_setopt($ch, CURLOPT_HTTPHEADER, $curl_headers);
+    curl_setopt($ch, CURLOPT_POST, true);
+    curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+
+    $response = curl_exec($ch);
+    $error = curl_error($ch);
+    curl_close($ch);
+
+    file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API response: " . $response . "\n", FILE_APPEND);
+
+    if ($error) {
+        file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] CURL error: " . $error . "\n", FILE_APPEND);
+    }
+    */
+
+  file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API call skipped (endpoint offline).\n\n", FILE_APPEND);
+}
+
+// function send_schedule_update_api($wpdb, $data)
+// {
+//   $log_file = __DIR__ . '/schedule_update_log.txt';
+
+//   file_put_contents(__DIR__ . '/schedule_update_log.txt', "[" . date('Y-m-d H:i:s') . "] update_schedule called\n", FILE_APPEND);
+
+//   // Fetch API details from DB
+//   $api = $wpdb->get_row(
+//     $wpdb->prepare("SELECT * FROM {$wpdb->prefix}api_keys WHERE slug = %s AND active = 1 LIMIT 1", 'update-schedule'),
+//     ARRAY_A
+//   );
+
+//   if (!$api) {
+//     // Could not find active API config
+//     error_log("API config for update-schedule not found.");
+//     return;
+//   }
+
+//   if (!$api) {
+//     file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API config for update-schedule not found.\n", FILE_APPEND);
+//     return;
+//   }
+
+//   if (file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API config found: " . print_r($api, true) . "\n", FILE_APPEND) === false) {
+//     error_log("Failed to write to log file: $log_file");
+//   }
+
+//   // Decode headers JSON stored in DB
+//   $headers = json_decode($api['headers'], true);
+//   if (!is_array($headers)) {
+//     $headers = [];
+//   }
+
+//   // Add your hashed key as an Authorization header or custom header (adjust as needed)
+//   // For example, if your API expects header: X-API-Key: <hashed_key>
+//   $headers['X-API-Key'] = $api['api_key'];
+
+//   // Format headers for cURL
+//   $curl_headers = [];
+//   foreach ($headers as $key => $value) {
+//     $curl_headers[] = $key . ': ' . $value;
+//   }
+
+//   // $payload = json_encode($data);
+
+//   // $ch = curl_init($api['endpoint']);
+//   // curl_setopt($ch, CURLOPT_RETURNTRANSFER, true);
+//   // curl_setopt($ch, CURLOPT_HTTPHEADER, $curl_headers);
+//   // curl_setopt($ch, CURLOPT_POST, true);
+//   // curl_setopt($ch, CURLOPT_POSTFIELDS, $payload);
+
+//   // $response = curl_exec($ch);
+//   // $error = curl_error($ch);
+//   // curl_close($ch);
+
+//   file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Headers prepared for request:\n" . implode("\n", $curl_headers) . "\n", FILE_APPEND);
+
+//   $payload = json_encode($data);
+//   file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] Payload prepared for request:\n" . $payload . "\n", FILE_APPEND);
+
+//   file_put_contents($log_file, "[" . date('Y-m-d H:i:s') . "] API call skipped (endpoint offline).\n\n", FILE_APPEND);
+// }

@@ -126,7 +126,8 @@ function wdb_run_schema_updates()
             endpoint     TEXT NOT NULL,
             method       VARCHAR(10) NOT NULL DEFAULT 'GET', 
             headers      TEXT NULL,                           
-            parameters   TEXT NULL,                           
+            secret_salt  TEXT NULL,                           
+            api_key      TEXT NULL,                           
             is_active    TINYINT(1) NOT NULL DEFAULT 1,      
             created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
             updated_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
