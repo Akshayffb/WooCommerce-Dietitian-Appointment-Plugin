@@ -101,6 +101,23 @@ function wdb_add_admin_menu()
     'wdb_api_detail_page'
   );
 
+  add_submenu_page(
+    'wdb-manage-apis',
+    'API Logs',
+    'API Logs',
+    'manage_options',
+    'wdb-api-logs',
+    'wdb_api_logs_page'
+  );
+
+  add_submenu_page(
+    null,
+    'API Log Detail',
+    'API Log Detail',
+    'manage_options',
+    'wdb-api-log-detail',
+    'wdb_api_log_detail_callback'
+  );
 
   add_submenu_page(
     'wdb-all-appointments',
@@ -201,6 +218,16 @@ function wdb_add_api_page()
 function wdb_api_detail_page()
 {
   include_once plugin_dir_path(__FILE__) . 'includes/apis/api-detail.php';
+}
+
+function wdb_api_logs_page()
+{
+  include plugin_dir_path(__FILE__) . 'includes/apis/api-logs.php';
+}
+
+function wdb_api_log_detail_callback()
+{
+  include plugin_dir_path(__FILE__) . 'includes/apis/api-log-detail.php';
 }
 
 require_once plugin_dir_path(__FILE__) . 'includes/components/shortcodes.php';

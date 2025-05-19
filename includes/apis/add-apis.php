@@ -65,7 +65,6 @@ if (
             <option value="">-- Select API Slug --</option>
             <option value="cancel-schedule">cancel-schedule</option>
             <option value="update-schedule">update-schedule</option>
-            <!-- Add more predefined slugs here as needed -->
           </select>
         </td>
       </tr>

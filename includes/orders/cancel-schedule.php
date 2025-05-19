@@ -66,7 +66,7 @@ function cancel_schedule($wpdb)
 function send_cancel_schedule_api($api_table, $wpdb, $data)
 {
   $api_slug = 'cancel-schedule';
-  
+
   $log_file = __DIR__ . '/cancel_schedule_log.txt';
 
   $api = $wpdb->get_row(
@@ -91,6 +91,7 @@ function send_cancel_schedule_api($api_table, $wpdb, $data)
   }
 
   $payload = json_encode($data);
+  $start = microtime(true);
 
   // Make the actual API request
   $ch = curl_init($api['endpoint']);
@@ -104,18 +105,27 @@ function send_cancel_schedule_api($api_table, $wpdb, $data)
   $curl_error = curl_error($ch);
   curl_close($ch);
 
+  $duration = round((microtime(true) - $start) * 1000);
+  $ip_address = $_SERVER['REMOTE_ADDR'] ?? null;
+  $user_agent = $_SERVER['HTTP_USER_AGENT'] ?? null;
+
   // Insert API call log
   $wpdb->insert(
     $wpdb->prefix . 'wdb_api_logs',
     [
-      'api_slug' => $api_slug,
+      'user_id'         => get_current_user_id(),
+      'api_slug'        => $api_slug,
       'request_payload' => $payload,
-      'response_text' => $response ?: '',
-      'status_code' => $http_code ?: 0,
-      'error_message' => $curl_error ?: null,
-      'created_at' => current_time('mysql'),
+      'response_text'   => $response ?: '',
+      'status_code'     => $http_code ?: 0,
+      'error_message'   => $curl_error ?: null,
+      'retries'         => 0,
+      'ip_address'      => $ip_address,
+      'user_agent'      => $user_agent,
+      'duration_ms'     => $duration,
+      'created_at'      => current_time('mysql'),
     ],
-    ['%s', '%s', '%s', '%d', '%s', '%s']
+    ['%d', '%s', '%s', '%s', '%d', '%s', '%d', '%s', '%s', '%d', '%s']
   );
 
   // Also keep file logs if needed
