@@ -13,35 +13,31 @@ function wdb_generate_plan_schedule($order_id)
     return;
   }
 
+  // Unserialize the selected_days and meal_type fields
   $selected_days = maybe_unserialize($plan->selected_days);
   $raw_meal_types = maybe_unserialize($plan->meal_type);
-  $cleaned_meal_types = [];
 
-  if (is_array($raw_meal_types)) {
-    foreach ($raw_meal_types as $type) {
-      // Split on newline, comma, or carriage return
-      $split_types = preg_split('/[\r\n,]+/', $type);
-      foreach ($split_types as $t) {
-        $t = trim($t);
-        if ($t !== '') {
-          $cleaned_meal_types[] = $t;
-        }
+  // Extract individual meal parts without hardcoding
+  $meal_parts = [];
+
+  foreach ($raw_meal_types as $meal) {
+    $parts = preg_split('/\s+/', trim($meal));
+    foreach ($parts as $part) {
+      $cleaned = ucfirst(strtolower(trim($part)));
+      if (!empty($cleaned) && !in_array($cleaned, $meal_parts)) {
+        $meal_parts[] = $cleaned;
       }
     }
-  } else {
-    // Fallback if not an array
-    $cleaned_meal_types[] = trim($raw_meal_types);
   }
 
-  $cleaned_meal_types = array_unique($cleaned_meal_types);
+  $cleaned_meal_types = $meal_parts;
 
   $start_date    = $plan->start_date;
   $plan_duration = (int)$plan->plan_duration;
-  $time_slot     = $plan->time;
+  $time_slots    = array_map('trim', explode(',', $plan->time)); // delivery windows
   $category      = $plan->category;
   $product_id    = $plan->product_id;
 
-  $schedule_data = [];
   $current_date = new DateTime($start_date);
   $deliveries_made = 0;
 
@@ -61,37 +57,29 @@ function wdb_generate_plan_schedule($order_id)
         $ingredients = $meal_plan_info['ingredients'];
       }
 
-      $schedule_data[] = [
-        'no' => $deliveries_made + 1,
-        'date' => $current_date->format('d M Y'),
-        'day' => ucfirst($weekday),
-        'meals' => $meal_name,
-        'times' => $time_slot,
-        'meal_type' => implode(', ', $cleaned_meal_types),
-        'ingredients' => $ingredients,
-        'category' => $category,
-      ];
+      // Insert one row per meal type with matching delivery window or fallback to last
+      foreach ($cleaned_meal_types as $index => $meal_type) {
+        $delivery_window = $time_slots[$index] ?? end($time_slots) ?? 'N/A';
+
+        $wpdb->insert(
+          $wpdb->prefix . 'wdb_meal_plan_schedules',
+          [
+            'meal_plan_id'    => $plan->id,
+            'serve_date'      => $formatted_date,
+            'weekday'         => ucfirst($weekday),
+            'meal_info'       => "Meals: $meal_name | Ingredients: $ingredients",
+            'meal_type'       => $meal_type,
+            'delivery_window' => $delivery_window,
+            'status'          => $plan->status ?? 'active',
+            'message'         => null,
+          ]
+        );
+      }
+
       $deliveries_made++;
     }
 
     $current_date->modify('+1 day');
-  }
-
-  $meals_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
-
-  foreach ($schedule_data as $schedule) {
-
-    $wpdb->insert(
-      $meals_table,
-      [
-        'meal_plan_id'    => $plan->id,
-        'serve_date'      => DateTime::createFromFormat('d M Y', $schedule['date'])->format('Y-m-d'),
-        'weekday'         => $schedule['day'],
-        'meal_info'       => "Meals: " . $schedule['meals'] . " | Ingredients: " . $schedule['ingredients'],
-        'meal_type' => $schedule['meal_type'],
-        'delivery_window' => $schedule['times'],
-      ]
-    );
   }
 }
 

@@ -81,29 +81,27 @@ function wdb_store_order_meta_to_meal_plan_table($order_id)
         $category_name = !empty($categories) ? $categories[0]->name : '';
 
         // Insert into DB
-        $inserted = $wpdb->insert($table, [
-            'order_id'      => $order_id,
-            'product_id' => $product_id,
-            'user_id'       => $user_id,
-            'plan_name'     => $product_name,
-            'plan_duration' => get_plan_durations($order),
-            'category'      => $category_name,
-            'start_date'    => date('Y-m-d', strtotime($start_date)),
-            'selected_days' => maybe_serialize($selected_days),
-            'meal_type'     => maybe_serialize($meal_type),
-            'time'          => implode(',', $delivery_time),
-            'ingredients'   => maybe_serialize($ingredients),
-            'grand_total'   => $grand_total,
-            'notes'         => $food_notes,
-        ]);
+        // $inserted = $wpdb->insert($table, [
+        //     'order_id'      => $order_id,
+        //     'product_id' => $product_id,
+        //     'user_id'       => $user_id,
+        //     'plan_name'     => $product_name,
+        //     'plan_duration' => get_plan_durations($order),
+        //     'category'      => $category_name,
+        //     'start_date'    => date('Y-m-d', strtotime($start_date)),
+        //     'selected_days' => maybe_serialize($selected_days),
+        //     'meal_type'     => maybe_serialize($meal_type),
+        //     'time'          => implode(',', $delivery_time),
+        //     'ingredients'   => maybe_serialize($ingredients),
+        //     'grand_total'   => $grand_total,
+        //     'notes'         => $food_notes,
+        // ]);
 
-        if ($inserted) {
-            if (function_exists('wdb_generate_plan_schedule')) {
-                wdb_generate_plan_schedule($order_id);
-            } else {
-                error_log('Insert failed for order ID: ' . $order_id);
-            }
-        }
+        // if ($inserted) {
+        //     if (function_exists('wdb_generate_plan_schedule')) {
+        //         wdb_generate_plan_schedule($order_id);
+        //     }
+        // }
     }
 }
 

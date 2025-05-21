@@ -38,6 +38,8 @@ function wdb_run_schema_updates()
     $wpdb->query("DROP TABLE IF EXISTS $table");
   }
 
+  $post_table   = $wpdb->prefix . 'posts';
+
   $sql1 = "CREATE TABLE {$dietitians_table} (
     id               BIGINT(20) UNSIGNED AUTO_INCREMENT PRIMARY KEY,
     user_id          BIGINT(20) UNSIGNED NULL,
@@ -92,7 +94,11 @@ function wdb_run_schema_updates()
     ingredients      TEXT NOT NULL,
     grand_total      DECIMAL(10,2) NOT NULL,
     notes            TEXT,
-    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+    created_at       TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
+    FOREIGN KEY (user_id) REFERENCES {$wpdb->users}(ID) ON DELETE CASCADE,
+    FOREIGN KEY (order_id) REFERENCES {$post_table}(ID) ON DELETE CASCADE,
+    FOREIGN KEY (product_id) REFERENCES {$post_table}(ID) ON DELETE CASCADE
 ) {$charset_collate};";
 
   $sql5 = "CREATE TABLE {$meals_schedule_table} (
@@ -105,6 +111,8 @@ function wdb_run_schema_updates()
     delivery_window VARCHAR(50),
     status          VARCHAR(20) NOT NULL DEFAULT 'active',
     message         TEXT,
+    created_at      TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at      DATETIME DEFAULT CURRENT_TIMESTAMP ON UPDATE CURRENT_TIMESTAMP
     FOREIGN KEY (meal_plan_id) REFERENCES {$meal_plan_table}(id) ON DELETE CASCADE,
     KEY (meal_plan_id)
 ) {$charset_collate};";
@@ -148,9 +156,6 @@ function wdb_run_schema_updates()
     user_agent    VARCHAR(255) NULL,
     duration_ms   INT NULL,
     created_at    DATETIME DEFAULT CURRENT_TIMESTAMP,
-    INDEX (user_id),
-    INDEX (api_slug),
-    INDEX (created_at)
 );";
 
   require_once ABSPATH . 'wp-admin/includes/upgrade.php';

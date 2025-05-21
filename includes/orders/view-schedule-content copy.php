@@ -114,6 +114,18 @@ function wdb_schedule_endpoint_content()
                 echo '<td rowspan="' . $count . '">' . $sl++ . '</td>';
                 echo '<td rowspan="' . $count . '">';
                 echo '<div>' . date('d M Y', strtotime($meal['serve_date'])) . '</div>';
+
+                $status = strtolower(trim($meal['status'] ?? 'N/A'));
+
+                if ($status === 'cancelled') {
+                  $status_class = 'text-danger';
+                } elseif ($status === 'rescheduled') {
+                  $status_class = 'text-warning';
+                } else {
+                  $status_class = 'text-success';
+                }
+
+                echo '<div class="' . $status_class . ' small">' . esc_html($status) . '</div>';
                 echo '</td>';
                 echo '<td rowspan="' . $count . '">' . esc_html($meal['weekday']) . '</td>';
                 echo '<td rowspan="' . $count . '">';
@@ -303,7 +315,7 @@ function wdb_schedule_endpoint_content()
           </div>
 
           <div class="modal-footer">
-            <button type="submit" class="btn btn-outline-info">Submit</button>
+            <button type="button" class="btn btn-outline-info" type="submit">Submit</button>
           </div>
         </form>
       </div>
@@ -371,6 +383,27 @@ function wdb_schedule_endpoint_content()
         }
       }
 
+      // function updateModalTextAndSections() {
+      //   const selectedOption = $('input[name="cancel_option"]:checked').val();
+      //   const serveDateText = $("#meal-date").text() || 'selected date';
+
+      //   if (selectedOption === "reschedule_meal_type") {
+      //     $("#cancelModalLabel").text('Reschedule Meal');
+      //     $("#cancel-modal-text").text("You are rescheduling the selected meal.");
+      //     $("#reschedule-section").removeClass("d-none");
+      //     $("#confirm-reschedule").removeClass("d-none");
+      //     $("#just-cancel").addClass("d-none");
+      //     $("#show-reschedule").addClass("d-none");
+      //   } else {
+      //     $("#cancelModalLabel").text('Cancel Meal');
+      //     $("#cancel-modal-text").text("Are you sure you want to cancel the selected meal?");
+      //     $("#reschedule-section").addClass("d-none");
+      //     $("#confirm-reschedule").addClass("d-none");
+      //     $("#just-cancel").removeClass("d-none");
+      //     $("#show-reschedule").removeClass("d-none");
+      //   }
+      // }
+
       $(".open-update-modal").on("click", function() {
         const date = $(this).data("date");
         const weekday = $(this).data("weekday");
@@ -408,14 +441,78 @@ function wdb_schedule_endpoint_content()
         $("#selected-meal-type").text(mealType);
       });
 
+      // $("#just-cancel").on("click", function() {
+      //   const selectedOption = $('input[name="cancel_option"]:checked').val();
+
+      //   if (selectedOption === "full_day") {
+      //     $("#cancelMealForm").append('<input type="hidden" name="action" value="cancel">');
+      //     $('#cancelMealForm input[name="form_action"]').val('cancel_schedule');
+      //     $("#cancelMealForm").submit();
+      //   } else {
+      //     $("#reschedule-section").removeClass("d-none");
+      //     $("#confirm-reschedule").removeClass("d-none");
+      //     $("#just-cancel").addClass("d-none");
+      //     $("#show-reschedule").addClass("d-none");
+      //   }
+      // });
+
+      // $('input[name="cancel_option"]').on('change', function() {
+      //   updateModalTextAndSections();
+      // });
+
+      // $("#show-reschedule").on("click", function() {
+      //   $("#reschedule-section").removeClass("d-none");
+      //   $("#confirm-reschedule").removeClass("d-none");
+      //   $("#just-cancel").addClass("d-none");
+      //   $("#show-reschedule").addClass("d-none");
+      // });
+
+      // $("#confirm-reschedule").on("click", function() {
+      //   let valid = true;
+
+      //   const newMealType = $("#cancel-modal-weekday").val();
+      //   if (!newMealType) {
+      //     $("#cancel-modal-weekday").addClass("is-invalid");
+      //     valid = false;
+      //   } else {
+      //     $("#cancel-modal-weekday").removeClass("is-invalid");
+      //   }
+
+      //   // Validate delivery time
+      //   const newDelivery = $("#cancel-modal-delivery").val();
+      //   if (!newDelivery) {
+      //     $("#cancel-modal-delivery").addClass("is-invalid");
+      //     valid = false;
+      //   } else {
+      //     $("#cancel-modal-delivery").removeClass("is-invalid");
+      //   }
+
+      //   if (!valid) return;
+
+      //   // Proceed with form submission
+      //   $("#cancelMealForm").append('<input type="hidden" name="action" value="reschedule">');
+      //   $('#cancelMealForm input[name="form_action"]').val('reschedule_schedule');
+      //   $("#cancelMealForm").submit();
+      // });
+
       $("#cancel-entire-day-checkbox").on('click', function() {
         if ($(this).is(':checked')) {
           $("#reschedule-section").hide();
-          $('input[name="form_action"]').val('cancel_schedule');
         } else {
           $("#reschedule-section").show();
-          $('input[name="form_action"]').val('reschedule_schedule');
         }
+      });
+
+      $("#cancelMealForm").on("submit", function(e) {
+        e.preventDefault();
+
+        if ($("#cancel-entire-day-checkbox").is(":checked")) {
+          $(this).find('input[name="form_action"]').val('cancel_schedule');
+        } else {
+          $(this).find('input[name="form_action"]').val('reschedule_schedule');
+        }
+
+        $(this).submit();
       });
 
       $("#modal-meal-type").on("change", function() {

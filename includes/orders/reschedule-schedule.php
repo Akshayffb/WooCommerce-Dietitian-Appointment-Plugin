@@ -3,6 +3,7 @@
 function reschedule_schedule($wpdb)
 {
 
+  $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
   $schedule_status_table = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
 
@@ -24,6 +25,22 @@ function reschedule_schedule($wpdb)
       return;
     }
 
+    $plan = $wpdb->get_row(
+      $wpdb->prepare("SELECT * FROM $meal_plan_table WHERE id = %d", $meal_id)
+    );
+
+    $formatted_date = (new DateTime($plan->serve_date))->format('Y-m-d');
+    $meal_plan_info = calculate_meal_info($formatted_date, $plan['product_id']);
+
+    if (isset($meal_plan_info['error'])) {
+      error_log("Meal plan error for $formatted_date: " . $meal_plan_info['error']);
+      $meal_name = 'N/A';
+      $ingredients = 'N/A';
+    } else {
+      $meal_name = $meal_plan_info['plan_name'];
+      $ingredients = $meal_plan_info['ingredients'];
+    }
+
     $wpdb->insert(
       $schedule_status_table,
       [
@@ -41,7 +58,7 @@ function reschedule_schedule($wpdb)
         'meal_plan_id' => $meal_plan_id,
         'serve_date' => $reschedule_date,
         'weekday' => $new_weekday,
-        'meal_info' => '',
+        'meal_info'       => "Meals: $meal_name | Ingredients: $ingredients",
         'meal_type' => $new_meal_type,
         'delivery_window' => $new_delivery,
         'status' => 'rescheduled',
