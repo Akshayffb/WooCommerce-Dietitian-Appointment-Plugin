@@ -17,6 +17,7 @@ function reschedule_schedule($wpdb)
     !isset($_POST['cancel_reschedule_nonce']) ||
     !wp_verify_nonce($_POST['cancel_reschedule_nonce'], 'cancel_or_reschedule_action')
   ) {
+    file_put_contents($logFile, "ERROR: Invalid or missing security token.\n", FILE_APPEND);
     echo "<p class='text-danger'>Invalid or missing security token.</p>";
     return;
   }
@@ -24,6 +25,7 @@ function reschedule_schedule($wpdb)
   $required_fields = ['meal_plan_id', 'meal_plan_schedule_id', 'new_serve_date', 'new_weekday', 'new_meal_type', 'new_delivery'];
   foreach ($required_fields as $field) {
     if (empty($_POST[$field])) {
+      file_put_contents($logFile, "ERROR: Missing required field: $field\n", FILE_APPEND);
       echo "<p class='text-danger'>Missing required field: $field</p>";
       return;
     }
@@ -38,18 +40,21 @@ function reschedule_schedule($wpdb)
   $new_delivery = sanitize_text_field($_POST['new_delivery']);
 
   if (!preg_match('/^\d{4}-\d{2}-\d{2}$/', $new_serve_date)) {
+    file_put_contents($logFile, "ERROR: Invalid date format: $new_serve_date\n", FILE_APPEND);
     echo "<p class='text-danger'>Invalid date format.</p>";
     return;
   }
 
   $date_timestamp = strtotime($new_serve_date);
   if (!$date_timestamp) {
+    file_put_contents($logFile, "ERROR: Invalid date provided: $new_serve_date\n", FILE_APPEND);
     echo "<p class='text-danger'>Invalid date provided.</p>";
     return;
   }
 
   $calculated_weekday = date('l', $date_timestamp);
   if ($calculated_weekday !== $new_weekday) {
+    file_put_contents($logFile, "ERROR: Weekday mismatch. Provided: $new_weekday, Calculated: $calculated_weekday\n", FILE_APPEND);
     echo "<p class='text-danger'>Weekday does not match the date provided.</p>";
     return;
   }
@@ -63,6 +68,7 @@ function reschedule_schedule($wpdb)
   );
 
   if (!$existing) {
+    file_put_contents($logFile, "ERROR: Schedule not found for id: $schedule_id and meal_plan_id: $meal_plan_id\n", FILE_APPEND);
     echo "<p class='text-danger'>Schedule with given ID and meal plan ID not found.</p>";
     return;
   }
@@ -84,10 +90,14 @@ function reschedule_schedule($wpdb)
   );
 
   if ($updated === false) {
+    $error = $wpdb->last_error;
+    file_put_contents($logFile, "ERROR: Failed to update schedule. DB error: $error\n", FILE_APPEND);
     echo "<p class='text-danger'>Failed to update schedule. Please try again.</p>";
   } else if ($updated === 0) {
+    file_put_contents($logFile, "INFO: No changes made, schedule data is the same for id: $schedule_id\n", FILE_APPEND);
     echo "<p class='text-warning'>No changes made, schedule data is the same.</p>";
   } else {
+    file_put_contents($logFile, "SUCCESS: Schedule rescheduled successfully for id: $schedule_id\n", FILE_APPEND);
     echo "<p class='text-success'>Schedule rescheduled successfully.</p>";
   }
 }

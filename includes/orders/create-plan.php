@@ -86,8 +86,8 @@ function wdb_generate_plan_schedule($order_id)
 function calculate_meal_info($date_str, $product_id)
 {
   $date = new DateTime($date_str);
-  $day_name = $date->format('l');         // e.g., 'Monday'
-  $weekday_number = (int)$date->format('N'); // 1 (Mon) to 7 (Sun)
+  $day_name = $date->format('l');
+  $weekday_number = (int)$date->format('N');
   $day_of_month = (int)$date->format('j');
 
   $occurrence = 0;
