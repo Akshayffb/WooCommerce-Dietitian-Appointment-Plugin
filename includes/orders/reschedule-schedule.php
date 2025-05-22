@@ -4,14 +4,6 @@ function reschedule_schedule($wpdb)
 {
   $meal_plan_table = $wpdb->prefix . 'wdb_meal_plans';
   $schedule_table = $wpdb->prefix . 'wdb_meal_plan_schedules';
-  $schedule_status_table = $wpdb->prefix . 'wdb_meal_plan_schedule_status';
-
-  $logFile = __DIR__ . '/request.log';
-
-  // Log incoming POST data
-  $logData = "---- " . date('Y-m-d H:i:s') . " ----\n";
-  $logData .= "POST Data:\n" . print_r($_POST, true) . "\n";
-  file_put_contents($logFile, $logData, FILE_APPEND);
 
   if (
     !isset($_POST['cancel_reschedule_nonce']) ||
@@ -67,11 +59,35 @@ function reschedule_schedule($wpdb)
     return;
   }
 
+  $product_id = $wpdb->get_var(
+    $wpdb->prepare(
+      "SELECT product_id FROM $meal_plan_table WHERE id = %d",
+      $meal_plan_id
+    )
+  );
+
+  if (!$product_id) {
+    echo "<p class='text-danger'>Product ID not found for the given meal plan.</p>";
+    return;
+  }
+
+  $meal_info = calculate_meal_info($new_serve_date, $product_id);
+
+  if (isset($meal_info['error'])) {
+    error_log("Meal Info Error: " . $meal_info['error'] . "\n");
+    $meal_name = 'N/A';
+    $ingredients = 'N/A';
+  } else {
+    $meal_name = $meal_info['plan_name'];
+    $ingredients = $meal_info['ingredients'];
+  }
+
   $updated = $wpdb->update(
     $schedule_table,
     [
       'serve_date' => $new_serve_date,
       'weekday' => $new_weekday,
+      'meal_info'       => "Meals: $meal_name | Ingredients: $ingredients",
       'meal_type' => $new_meal_type,
       'delivery_window' => $new_delivery
     ],
@@ -79,7 +95,7 @@ function reschedule_schedule($wpdb)
       'id' => $schedule_id,
       'meal_plan_id' => $meal_plan_id
     ],
-    ['%s', '%s', '%s', '%s'],
+    ['%s', '%s', '%s', '%s', '%s'],
     ['%d', '%d']
   );
 
