@@ -137,6 +137,8 @@ function wdb_run_schema_updates()
     headers      TEXT NULL,
     secret_salt  TEXT NULL,
     api_key      TEXT NULL,
+    public_key   TEXT NULL,
+    secret_key   TEXT NULL,
     is_active    TINYINT(1) NOT NULL DEFAULT 1,
     client_ip    VARCHAR(45) NULL,
     created_at   TIMESTAMP DEFAULT CURRENT_TIMESTAMP,

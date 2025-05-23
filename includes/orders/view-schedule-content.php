@@ -240,6 +240,7 @@ function wdb_schedule_endpoint_content()
 
           <div class="modal-body">
             <?php wp_nonce_field('cancel_or_reschedule_action', 'cancel_reschedule_nonce'); ?>
+            <input type="hidden" name="order_id" value="<?php echo esc_attr($plan['order_id']); ?>">
             <input type="hidden" name="meal_plan_id" value="<?php echo esc_attr($plan['id']); ?>">
             <input type="hidden" name="meal_plan_schedule_id" id="meal-plan-schedule-id">
 
@@ -254,6 +255,7 @@ function wdb_schedule_endpoint_content()
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label for="reschedule-date" class="form-label">New Date</label>
+                  <input type="hidden" name="original_date" id="original_date_selected">
                   <input type="date" class="form-control" name="new_serve_date" id="reschedule-date" required>
                   <div class="invalid-feedback">Date cannot be in the past.</div>
                 </div>
@@ -266,6 +268,7 @@ function wdb_schedule_endpoint_content()
               <div class="row">
                 <div class="col-md-6 mb-3">
                   <label for="cancel-modal-meal-type" class="form-label">New Meal Type</label>
+                  <input type="hidden" name="original_meal_type" id="original_meal_type">
                   <select class="form-select" name="new_meal_type" id="cancel-modal-meal-type" required>
                     <option value="breakfast">Breakfast</option>
                     <option value="lunch">Lunch</option>
@@ -274,6 +277,7 @@ function wdb_schedule_endpoint_content()
                 </div>
                 <div class="col-md-6 mb-3">
                   <label for="cancel-modal-delivery" class="form-label">Delivery Time</label>
+                  <input type="hidden" name="original_delivery" id="original_delivery">
                   <select class="form-select" name="new_delivery" id="cancel-modal-delivery" required></select>
                 </div>
               </div>
@@ -387,6 +391,9 @@ function wdb_schedule_endpoint_content()
         $("#original-meal-day").text(mealWeekday);
 
         $("#reschedule-date").val(serveDate);
+        $("#original_date_selected").val(serveDate);
+        $("#original_meal_type").val(mealType);
+        $("#original_delivery").val(deliveryTime);
         $("#cancel_original_meal_type").val(mealType);
 
         updateWeekdayFromDateInput(serveDate, "cancel-modal-weekday");

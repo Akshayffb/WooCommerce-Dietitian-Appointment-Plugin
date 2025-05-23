@@ -10,28 +10,49 @@ if (!current_user_can('manage_options')) {
 global $wpdb;
 $table = $wpdb->prefix . 'wdb_apis';
 
-// Handle form submission (your existing form logic)
+$encryption_key = defined('API_ENCRYPTION_KEY') ? API_ENCRYPTION_KEY : null;
+if (!$encryption_key) {
+  wp_die('Encryption key not configured.');
+}
+
+function encrypt_api_key($plain_key, $encryption_key)
+{
+  $iv = random_bytes(16);
+  $encrypted = openssl_encrypt($plain_key, 'AES-256-CBC', $encryption_key, 0, $iv);
+  return ['encrypted_key' => $encrypted, 'iv' => base64_encode($iv)];
+}
+
 if (
   $_SERVER['REQUEST_METHOD'] === 'POST'
   && isset($_POST['wdb_add_api_nonce'])
   && wp_verify_nonce($_POST['wdb_add_api_nonce'], 'wdb_add_api')
 ) {
-
   $secret_salt = sanitize_text_field($_POST['secret_salt']);
   $plain_api_key = bin2hex(random_bytes(32));
+
+  $encryption_result = encrypt_api_key($plain_api_key, $encryption_key);
+  $encrypted_api_key = $encryption_result['encrypted_key'];
+  $api_key_iv = $encryption_result['iv'];
+
   $hashed_api_key = hash_hmac('sha256', $plain_api_key, $secret_salt);
 
+  // NEW: generate public and secret keys for HMAC signature
+  $public_key = bin2hex(random_bytes(16));
+  $secret_key = bin2hex(random_bytes(32));
+
   $inserted = $wpdb->insert($table, [
-    'api_name'   => sanitize_text_field($_POST['api_name']),
-    'api_slug'   => sanitize_title($_POST['api_slug']),
-    'endpoint'   => esc_url_raw($_POST['endpoint']),
-    'method'     => sanitize_text_field($_POST['method']),
-    'headers'    => sanitize_textarea_field($_POST['headers']),
-    'api_key'    => $hashed_api_key,
-    'secret_salt' => $secret_salt,
-    'is_active'  => isset($_POST['is_active']) ? 1 : 0,
-    'created_at' => current_time('mysql'),
-    'updated_at' => current_time('mysql'),
+    'api_name'     => sanitize_text_field($_POST['api_name']),
+    'api_slug'     => sanitize_title($_POST['api_slug']),
+    'endpoint'     => esc_url_raw($_POST['endpoint']),
+    'method'       => sanitize_text_field($_POST['method']),
+    'headers'      => sanitize_textarea_field($_POST['headers']),
+    'api_key'      => $hashed_api_key,
+    'secret_salt'  => $secret_salt,
+    'public_key'   => $public_key,
+    'secret_key'   => $secret_key,
+    'is_active'    => isset($_POST['is_active']) ? 1 : 0,
+    'created_at'   => current_time('mysql'),
+    'updated_at'   => current_time('mysql'),
   ]);
 
   if ($inserted) {
@@ -39,59 +60,15 @@ if (
     echo '<p>API added successfully.</p>';
     echo '<p><strong>Your API key (copy it now, it will not be shown again):</strong></p>';
     echo '<pre style="background:#eee;padding:10px;border:1px solid #ccc;">' . esc_html($plain_api_key) . '</pre>';
+    echo '<p><strong>Your Public Key:</strong></p>';
+    echo '<pre style="background:#eee;padding:10px;border:1px solid #ccc;">' . esc_html($public_key) . '</pre>';
+    echo '<p><strong>Your Secret Key (save securely, not shown again):</strong></p>';
+    echo '<pre style="background:#eee;padding:10px;border:1px solid #ccc;">' . esc_html($secret_key) . '</pre>';
     echo '</div>';
   } else {
     echo '<div class="notice notice-error is-dismissible"><p>Failed to add API. Please try again.</p></div>';
   }
 }
-
-// Register REST API endpoint for external apps (add this after your form code)
-add_action('rest_api_init', function () use ($wpdb, $table) {
-  register_rest_route('wdb/v1', '/secure-endpoint', [
-    'methods' => 'POST',
-    'callback' => function (WP_REST_Request $request) use ($wpdb, $table) {
-      // Get Authorization header
-      $headers = $request->get_headers();
-      if (empty($headers['authorization'])) {
-        return new WP_REST_Response(['error' => 'Missing API key'], 401);
-      }
-      $auth_header = $headers['authorization'][0];
-      if (stripos($auth_header, 'Bearer ') !== 0) {
-        return new WP_REST_Response(['error' => 'Invalid Authorization header'], 401);
-      }
-      $provided_api_key = substr($auth_header, 7);
-
-      // Fetch active APIs
-      $apis = $wpdb->get_results("SELECT * FROM $table WHERE is_active = 1");
-
-      $valid = false;
-      foreach ($apis as $api) {
-        $hashed_provided_key = hash_hmac('sha256', $provided_api_key, $api->secret_salt);
-        if (hash_equals($hashed_provided_key, $api->api_key)) {
-          $valid = true;
-          break;
-        }
-      }
-
-      if (!$valid) {
-        return new WP_REST_Response(['error' => 'Invalid API key'], 403);
-      }
-
-      // Process the data sent by the external app
-      $params = $request->get_json_params();
-
-      // Here, you can do whatever processing you want with $params
-      // For demonstration, just echo back received data
-
-      return new WP_REST_Response([
-        'success' => true,
-        'message' => 'Authorized successfully',
-        'data_received' => $params,
-      ]);
-    },
-    'permission_callback' => '__return_true',
-  ]);
-});
 ?>
 
 <div class="wrap">
@@ -101,7 +78,6 @@ add_action('rest_api_init', function () use ($wpdb, $table) {
     <?php wp_nonce_field('wdb_add_api', 'wdb_add_api_nonce'); ?>
 
     <table class="form-table">
-      <!-- Your form fields here (unchanged) -->
       <tr>
         <th><label for="api_name">API Name</label></th>
         <td><input id="api_name" name="api_name" type="text" class="regular-text" required></td>

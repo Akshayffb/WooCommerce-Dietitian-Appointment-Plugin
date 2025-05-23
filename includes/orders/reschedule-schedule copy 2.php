@@ -8,20 +8,16 @@ function reschedule_schedule($wpdb)
   }
 
   $fields = extract_required_fields([
-    'order_id',
     'meal_plan_id',
     'meal_plan_schedule_id',
     'new_serve_date',
     'new_weekday',
     'new_meal_type',
-    'new_delivery',
-    'original_date',
-    'original_meal_type',
-    'original_delivery'
+    'new_delivery'
   ]);
   if (!$fields) return;
 
-  extract($fields);
+  extract($fields); // now you can use $meal_plan_id, $new_serve_date, etc.
 
   if (!validate_date_format($new_serve_date)) {
     echo error_msg('Invalid date format.');
@@ -185,6 +181,13 @@ function send_schedule_update_to_api($wpdb, $data, $user_id = null)
     $headers['X-PUBLIC-KEY'] = $api_config->public_key;
     $headers['X-SIGNATURE'] = $signature;
   }
+
+  // if (!empty($api_config->api_key) && !empty($api_config->secret_salt)) {
+  //   $token = hash_hmac('sha256', $api_config->api_key, $api_config->secret_salt);
+  //   $headers['X-API-TOKEN'] = $token;
+  // } elseif (!empty($api_config->api_key)) 
+  //   $headers['X-API-TOKEN'] = $api_config->api_key;
+  // }
 
   $args = [
     'headers' => $headers,

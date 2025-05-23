@@ -40,6 +40,7 @@ $apis = $wpdb->get_results("SELECT * FROM $apis_table");
         <th scope="col">Headers</th>
         <th scope="col">Salt Key</th>
         <th scope="col">Hashed Key</th>
+        <th scope="col">Public Key</th>
         <th scope="col">Endpoint</th>
         <th scope="col" width="6%">Active</th>
         <th scope="col" width="10%">Actions</th>
@@ -66,6 +67,7 @@ $apis = $wpdb->get_results("SELECT * FROM $apis_table");
             </td>
             <td><code style="word-break: break-word;"><?php echo esc_html($api->secret_salt); ?></code></td>
             <td><code style="word-break: break-word;"><?php echo esc_html($api->api_key); ?></code></td>
+            <td><code style="word-break: break-word;"><?php echo esc_html($api->public_key); ?></code></td>
             <td><a href="<?php echo esc_url($api->endpoint); ?>" target="_blank"><?php echo esc_html($api->endpoint); ?></a></td>
             <td>
               <?php echo $api->is_active
